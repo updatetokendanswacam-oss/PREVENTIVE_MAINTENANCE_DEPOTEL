@@ -113,13 +113,27 @@ export default function App() {
     initData();
   }, []);
 
-  // Realtime Sync Polling: Syncs operational changes across all open tabs and devices automatically
+  // Realtime Sync Listener (BroadcastChannel for multi-tab + 2s Polling for multi-device)
   const reportDataRef = useRef(reportData);
   useEffect(() => {
     reportDataRef.current = reportData;
   }, [reportData]);
 
   useEffect(() => {
+    let bc: BroadcastChannel | null = null;
+    try {
+      if (window.BroadcastChannel) {
+        bc = new BroadcastChannel('depotel_realtime_channel');
+        bc.onmessage = (event) => {
+          if (event.data && event.data.type === 'DASHBOARD_UPDATE' && event.data.data) {
+            if (event.data.data.updatedAt !== reportDataRef.current?.updatedAt) {
+              setReportData(event.data.data);
+            }
+          }
+        };
+      }
+    } catch (e) {}
+
     const syncInterval = setInterval(async () => {
       if (document.visibilityState === 'visible') {
         try {
@@ -135,9 +149,12 @@ export default function App() {
           // ignore transient poll error
         }
       }
-    }, 6000);
+    }, 2000);
 
-    return () => clearInterval(syncInterval);
+    return () => {
+      if (bc) bc.close();
+      clearInterval(syncInterval);
+    };
   }, []);
 
   // Save changes to API & storage asynchronously without blocking UI
@@ -243,35 +260,42 @@ export default function App() {
   }
 
   // Helper to ensure any operational update (sites, packages, genset, categories, etc.)
-  // updates the dashboard data instantly in realtime and preserves custom WhatsApp reports if edited
+  // updates the dashboard data instantly in realtime and handles WhatsApp report updates properly
   const applyDashboardUpdate = (
     dataUpdater: (prev: DailyReportData) => DailyReportData,
     toastMsg?: { message: string; type?: 'success' | 'error' | 'info' },
-    regenerateWhatsApp: boolean = true
+    regenerateWhatsApp: boolean = false
   ) => {
     const updated = dataUpdater(reportData);
     const lockKey = `depotel_custom_wa_is_edited_${reportData.id}`;
 
-    const isCustomLocked =
-      reportData.isCustomWhatsAppEdited === true ||
-      localStorage.getItem(lockKey) === 'true';
-
-    const savedCustomReport =
-      reportData.customWhatsAppReport ||
-      localStorage.getItem(`depotel_custom_wa_${reportData.id}`);
-
     let newWhatsAppText: string;
+    let isCustomLocked = false;
 
-    // User requirement: "jangan bikin ngerubah sendiri secara otomatis di Preview Laporan WhatsApp ketika sudah di closed"
-    // If the user explicitly custom-edited the WhatsApp text, strictly preserve custom text!
-    if (isCustomLocked && savedCustomReport && savedCustomReport.trim().length > 0) {
-      newWhatsAppText = savedCustomReport;
-    } else if (regenerateWhatsApp) {
+    if (regenerateWhatsApp) {
+      // User request: "ketika di tambahkan site di Preview Laporan WhatsApp akan tertambah sesuai list site"
+      // When explicitly regenerating (e.g. adding a new site), clear custom lock so newly added site appears in WhatsApp preview!
+      try {
+        localStorage.removeItem(lockKey);
+        localStorage.removeItem('depotel_custom_wa_permanent_latest');
+      } catch (e) {
+        console.warn('Storage clear lock error', e);
+      }
       newWhatsAppText = generateWhatsAppReport(updated);
+      isCustomLocked = false;
     } else {
+      // User request: "ketika di closed list site akan tersimpan dan tidak merubah otomatis lagi ke Preview Laporan WhatsApp"
+      isCustomLocked =
+        reportData.isCustomWhatsAppEdited === true ||
+        localStorage.getItem(lockKey) === 'true';
+
+      const savedCustomReport =
+        reportData.customWhatsAppReport ||
+        localStorage.getItem(`depotel_custom_wa_${reportData.id}`);
+
       newWhatsAppText = (savedCustomReport && savedCustomReport.trim().length > 0)
         ? savedCustomReport
-        : generateWhatsAppReport(updated);
+        : (reportData.customWhatsAppReport || generateWhatsAppReport(updated));
     }
 
     try {
@@ -287,10 +311,19 @@ export default function App() {
       updatedAt: new Date().toISOString(),
     };
 
-    // Realtime state update: Immediate React re-render without blocking UI thread
+    // Realtime state update: Immediate React re-render without blocking UI thread (0ms)
     setReportData(cleanUpdated);
 
-    // Save in background
+    // Broadcast update across open tabs/windows in realtime (0ms)
+    try {
+      if (window.BroadcastChannel) {
+        const bc = new BroadcastChannel('depotel_realtime_channel');
+        bc.postMessage({ type: 'DASHBOARD_UPDATE', data: cleanUpdated });
+        bc.close();
+      }
+    } catch (e) {}
+
+    // Save in background to server & storage
     persistChanges(cleanUpdated);
 
     if (toastMsg) {
