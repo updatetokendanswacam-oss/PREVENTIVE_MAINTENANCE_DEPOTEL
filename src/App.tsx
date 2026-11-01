@@ -315,6 +315,7 @@ export default function App() {
       try {
         localStorage.removeItem(lockKey);
         localStorage.removeItem('depotel_custom_wa_permanent_latest');
+        localStorage.removeItem(`depotel_custom_wa_${reportData.id}`);
       } catch (e) {
         console.warn('Storage clear lock error', e);
       }
