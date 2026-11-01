@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   Copy,
@@ -11,6 +11,7 @@ import {
   RotateCcw,
   Save,
   Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 import { DailyReportData } from '../types/reporting';
 import { generateWhatsAppReport } from '../utils/reportGenerator';
@@ -38,7 +39,13 @@ export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({
 
   const storageKey = `depotel_custom_wa_${reportData.id}`;
 
-  // Helper to determine initial text
+  // Calculate live report text from current WebApp data for on-demand sync
+  const liveGeneratedText = useMemo(() => {
+    return generateWhatsAppReport(reportData);
+  }, [reportData]);
+
+  // Determine initial text:
+  // Prioritizes saved custom report (from DB or localStorage) so it remains permanent and unchanged
   const getInitialText = () => {
     if (reportData.customWhatsAppReport && reportData.customWhatsAppReport.trim().length > 0) {
       return reportData.customWhatsAppReport;
@@ -47,34 +54,41 @@ export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({
     if (savedLocal && savedLocal.trim().length > 0) {
       return savedLocal;
     }
-    return generateWhatsAppReport(reportData);
+    return liveGeneratedText;
   };
-
-  const isInitiallyCustom = Boolean(
-    (reportData.customWhatsAppReport && reportData.customWhatsAppReport.trim().length > 0) ||
-      localStorage.getItem(storageKey)
-  );
 
   const [currentText, setCurrentText] = useState<string>(getInitialText);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [draftText, setDraftText] = useState<string>(getInitialText);
-  const [hasCustomSaved, setHasCustomSaved] = useState<boolean>(isInitiallyCustom);
+  const [hasCustomSaved, setHasCustomSaved] = useState<boolean>(true);
   const [copied, setCopied] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
-  // Sync state whenever modal opens or reportData changes
+  // Sync state whenever modal opens or report date changes (reportData.id)
+  // WebApp data updates will NOT reset or overwrite this text, keeping it permanent!
   useEffect(() => {
-    const text = getInitialText();
-    setCurrentText(text);
-    setDraftText(text);
-    setHasCustomSaved(
-      Boolean(
-        (reportData.customWhatsAppReport && reportData.customWhatsAppReport.trim().length > 0) ||
-          localStorage.getItem(storageKey)
-      )
-    );
+    if (!isOpen) return;
+
+    const saved = reportData.customWhatsAppReport || localStorage.getItem(storageKey);
+    if (saved && saved.trim().length > 0) {
+      setCurrentText(saved);
+      setDraftText(saved);
+      setHasCustomSaved(true);
+    } else {
+      // Auto-save initial generated text permanently if not yet created
+      const initialText = liveGeneratedText;
+      setCurrentText(initialText);
+      setDraftText(initialText);
+      setHasCustomSaved(true);
+      try {
+        localStorage.setItem(storageKey, initialText);
+      } catch (e) {}
+      if (onSaveCustomReport) {
+        onSaveCustomReport(initialText);
+      }
+    }
     setIsEditing(false);
-  }, [isOpen, reportData.id, reportData.customWhatsAppReport]);
+  }, [isOpen, reportData.id]);
 
   const handleStartEdit = () => {
     setDraftText(currentText);
@@ -96,41 +110,50 @@ export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({
     setIsSaving(true);
     try {
       // 1. Save to localStorage permanently
-      localStorage.setItem(storageKey, textToSave);
+      try {
+        localStorage.setItem(storageKey, textToSave);
+      } catch (e) {
+        console.warn('Local storage save error', e);
+      }
 
       // 2. Update state
       setCurrentText(textToSave);
       setHasCustomSaved(true);
       setIsEditing(false);
 
-      // 3. Persist to server / app state
+      // 3. Persist to server / app state permanently
       if (onSaveCustomReport) {
         await onSaveCustomReport(textToSave);
       }
 
-      onShowToast('Teks laporan WhatsApp berhasil disimpan permanen!', 'success');
+      onShowToast('Teks laporan WhatsApp tersimpan secara permanen!', 'success');
     } catch (err) {
       console.error('Failed to save custom report text', err);
-      onShowToast('Gagal menyimpan teks, tersimpan secara lokal di perangkat.', 'info');
+      onShowToast('Teks laporan tersimpan secara permanen di perangkat.', 'info');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleResetToAuto = async () => {
+  // On-demand refresh with live WebApp site data if user explicitly requests it
+  const handleRefreshFromWebApp = async () => {
     try {
-      localStorage.removeItem(storageKey);
       const generated = generateWhatsAppReport(reportData);
       setCurrentText(generated);
       setDraftText(generated);
-      setHasCustomSaved(false);
+      setHasCustomSaved(true);
       setIsEditing(false);
 
-      if (onResetCustomReport) {
-        await onResetCustomReport();
+      // Save the newly refreshed text permanently
+      try {
+        localStorage.setItem(storageKey, generated);
+      } catch (e) {}
+
+      if (onSaveCustomReport) {
+        await onSaveCustomReport(generated);
       }
 
-      onShowToast('Format dikembalikan ke hasil otomatis data terbaru!', 'info');
+      onShowToast('Teks laporan diperbarui dari data WebApp & tersimpan permanen!', 'success');
     } catch (err) {
       console.error(err);
       onShowToast('Format otomatis dimuat ulang.', 'info');
@@ -173,21 +196,15 @@ export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({
                 <h3 className="text-base sm:text-lg font-bold text-white truncate">
                   Preview Laporan WhatsApp
                 </h3>
-                {hasCustomSaved ? (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
-                    <Sparkles className="w-3 h-3 text-amber-400" />
-                    Kustom (Tersimpan Permanen)
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                    Format Otomatis
-                  </span>
-                )}
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-amber-400" />
+                  Tersimpan Permanen
+                </span>
               </div>
               <p className="text-xs text-slate-400 truncate mt-0.5">
                 {isEditing
-                  ? 'Mode Edit: Ubah isi laporan langsung & simpan secara permanen'
-                  : 'Siap dikirim ke grup WhatsApp DEPOTEL'}
+                  ? 'Mode Edit: Ubah isi laporan langsung & simpan permanen'
+                  : 'Tersimpan permanen & tidak berubah saat data WebApp diperbarui'}
               </p>
             </div>
           </div>
@@ -215,7 +232,7 @@ export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({
           </div>
         </div>
 
-        {/* Sub-toolbar when in Edit Mode or when Custom text is active */}
+        {/* Sub-toolbar */}
         <div className="px-4 py-2.5 bg-slate-950/60 border-b border-slate-800 flex items-center justify-between text-xs gap-2 flex-wrap">
           {isEditing ? (
             <>
@@ -259,17 +276,15 @@ export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({
               </div>
 
               <div className="flex items-center gap-2">
-                {hasCustomSaved && (
-                  <button
-                    type="button"
-                    onClick={handleResetToAuto}
-                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-300 text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer border border-slate-700"
-                    title="Reset teks kustom kembali ke format otomatis dari data live"
-                  >
-                    <RotateCcw className="w-3 h-3 text-slate-400" />
-                    <span>Reset ke Otomatis</span>
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={handleRefreshFromWebApp}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-300 text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer border border-slate-700"
+                  title="Muat ulang teks laporan dari data WebApp terbaru & simpan permanen"
+                >
+                  <RefreshCw className="w-3 h-3 text-amber-400" />
+                  <span>Sinkron Data WebApp</span>
+                </button>
 
                 <button
                   type="button"
@@ -291,7 +306,7 @@ export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({
               <div className="text-[11px] text-amber-400/90 bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-2 flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
                 <span>
-                  <strong>Tips:</strong> Anda dapat mengedit baris mana saja sesuai kebutuhan. Setelah disimpan, laporan ini akan <strong>tersimpan permanen</strong> dan tidak akan kembali ke semula saat dibuka lagi.
+                  <strong>Info:</strong> Setelah disimpan, teks ini akan <strong>tersimpan permanen</strong> dan <strong>tidak akan berubah</strong> meskipun data di WebApp diperbarui.
                 </span>
               </div>
 

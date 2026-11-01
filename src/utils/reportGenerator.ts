@@ -91,43 +91,40 @@ export function generateWhatsAppReport(data: DailyReportData): string {
     });
 
     // Rule:
-    // 1. If team has active package, show the latest active package (newly added site replaces old closed site)
+    // 1. If team has active packages, show all active packages (newly added sites appear in WhatsApp update, replacing old closed sites)
     // 2. If team has no active package, show ONLY the latest closed package (replaces previous closed site, avoiding double site)
     // 3. If no second site is added, the first closed site remains visible in WhatsApp update!
     let packagesToDisplay: typeof activePackages = [];
     if (activePackages.length > 0) {
-      packagesToDisplay = [activePackages[activePackages.length - 1]];
+      packagesToDisplay = activePackages;
     } else if (sortedClosedPackages.length > 0) {
       packagesToDisplay = [sortedClosedPackages[sortedClosedPackages.length - 1]];
     }
 
-    packagesToDisplay.forEach((pkg) => {
-      // 1. Site item line
-      const siteText = pkg.siteItem?.text || pkg.siteItem?.siteName || 'Site';
-      const siteStatus = pkg.isClosed ? 'DONE' : (pkg.siteItem?.status || 'PROGRESS');
-      siteLines.push(formatSiteLine(siteText, siteStatus));
-
-      // 2. SPACE TOWER item line
-      const towerText = pkg.towerItem?.text || 'Tower space';
-      const towerStatus = pkg.isClosed ? 'DONE' : (pkg.towerItem?.status || 'UNCHECKED');
-      siteLines.push(formatSiteLine(towerText, towerStatus));
-
-      // 3. CEK EAS item line
-      const easText = pkg.easItem?.text || 'EAS';
-      const easStatus = pkg.isClosed ? 'DONE' : (pkg.easItem?.status || 'UNCHECKED');
-      siteLines.push(formatSiteLine(easText, easStatus));
-    });
-
-    if (siteLines.length === 0) {
+    if (packagesToDisplay.length === 0) {
       lines.push('- Tidak ada site -');
     } else {
-      siteLines.forEach((sLine, sIdx) => {
-        lines.push(`${sIdx + 1}. ${sLine}`);
+      let itemNumber = 1;
+      packagesToDisplay.forEach((pkg) => {
+        // 1. Site item line
+        const siteText = pkg.siteItem?.text || pkg.siteItem?.siteName || 'Site';
+        const siteStatus = pkg.isClosed ? 'DONE' : (pkg.siteItem?.status || 'PROGRESS');
+        lines.push(`${itemNumber++}. ${formatSiteLine(siteText, siteStatus)}`);
+
+        // 2. SPACE TOWER item line
+        const towerText = pkg.towerItem?.text || 'Tower space';
+        const towerStatus = pkg.isClosed ? 'DONE' : (pkg.towerItem?.status || 'UNCHECKED');
+        lines.push(`${itemNumber++}. ${formatSiteLine(towerText, towerStatus)}`);
+
+        // 3. CEK EAS item line
+        const easText = pkg.easItem?.text || 'EAS';
+        const easStatus = pkg.isClosed ? 'DONE' : (pkg.easItem?.status || 'UNCHECKED');
+        lines.push(`${itemNumber++}. ${formatSiteLine(easText, easStatus)}`);
+
+        // Note under item 3. CEK EAS
+        const pkgNote = pkg.siteItem?.note?.trim() || pkg.note?.trim() || '-';
+        lines.push(`*NOTE :* ${pkgNote}`);
       });
-      // Note under item 3. CEK EAS
-      const currentPkg = packagesToDisplay[0];
-      const pkgNote = currentPkg?.siteItem?.note?.trim() || currentPkg?.note?.trim() || '-';
-      lines.push(`*NOTE :* ${pkgNote}`);
     }
 
     lines.push('');

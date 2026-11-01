@@ -266,10 +266,9 @@ async function startServer() {
         lastLoginAt: new Date().toISOString(),
       };
       db.users.push(newAcc);
-      // Auto switch to newly added account if desired
-      db.activeUserId = newAcc.id;
+      // DO NOT switch active user when adding account; retain current ADMIN DEPOTEL UTAMA session
       saveDatabase(db);
-      res.json({ success: true, message: 'Akun baru berhasil ditambahkan dan langsung aktif terkoneksi', account: newAcc });
+      res.json({ success: true, message: 'Akun baru berhasil ditambahkan', account: newAcc });
     }
   });
 

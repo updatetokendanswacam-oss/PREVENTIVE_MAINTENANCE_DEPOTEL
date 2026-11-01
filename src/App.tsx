@@ -95,15 +95,16 @@ export default function App() {
       setReportData(data);
       setSyncStatus(source);
 
-      // Fetch accounts and set active account
+      // Fetch accounts and ensure user stays as ADMIN DEPOTEL UTAMA
       try {
-        const { users, activeUserId } = await fetchAccounts();
+        const { users } = await fetchAccounts();
         setAccounts(users);
-        const current = users.find((u) => u.id === activeUserId) || users[0] || null;
-        setActiveAccount(current);
-        if (current) {
-          setIsAdmin(current.role === 'ROLE_ADMIN' && current.status === 'AKTIF');
-        }
+        const adminAccount = users.find((u) => u.id === 'acc-admin-main') ||
+                             users.find((u) => u.email === 'updatetokendanswacam@gmail.com') ||
+                             users.find((u) => u.role === 'ROLE_ADMIN' && u.status === 'AKTIF') ||
+                             users[0] || null;
+        setActiveAccount(adminAccount);
+        setIsAdmin(true);
       } catch (err) {
         console.warn('Could not load accounts:', err);
       }
@@ -134,14 +135,19 @@ export default function App() {
 
   const handleSaveAccount = async (accountData: Partial<AppAccount>) => {
     const res = await saveAccount(accountData);
-    const { users, activeUserId } = await fetchAccounts();
+    const { users } = await fetchAccounts();
     setAccounts(users);
-    const current = users.find((u) => u.id === activeUserId) || users[0] || null;
-    setActiveAccount(current);
-    if (current) {
-      setIsAdmin(current.role === 'ROLE_ADMIN' && current.status === 'AKTIF');
-    }
-    showToast(res.message || 'Akun berhasil disimpan', 'success');
+    
+    // User request: "saya tetep menggunakan akun ADMIN DEPOTEL UTAMA yang memegang hak akses , ketika saya menambahkan akun user dan admin tidak beralih ke akun user dan admin , hanya menambahkan saja"
+    setActiveAccount((prev) => {
+      const adminMain = users.find((u) => u.id === 'acc-admin-main') || 
+                        users.find((u) => u.email === 'updatetokendanswacam@gmail.com') ||
+                        users.find((u) => u.role === 'ROLE_ADMIN' && u.status === 'AKTIF');
+      if (prev?.id === 'acc-admin-main') return prev;
+      return adminMain || prev || users[0];
+    });
+    setIsAdmin(true);
+    showToast(res.message || 'Akun berhasil ditambahkan', 'success');
   };
 
   const handleToggleStatus = async (id: string) => {
@@ -161,13 +167,15 @@ export default function App() {
   const handleDeleteAccount = async (id: string) => {
     try {
       await deleteAccount(id);
-      const { users, activeUserId } = await fetchAccounts();
+      const { users } = await fetchAccounts();
       setAccounts(users);
-      const current = users.find((u) => u.id === activeUserId) || users[0] || null;
-      setActiveAccount(current);
-      if (current) {
-        setIsAdmin(current.role === 'ROLE_ADMIN' && current.status === 'AKTIF');
-      }
+      setActiveAccount((prev) => {
+        const adminMain = users.find((u) => u.id === 'acc-admin-main') || 
+                          users.find((u) => u.email === 'updatetokendanswacam@gmail.com');
+        if (prev && prev.id !== id && prev.id === 'acc-admin-main') return prev;
+        return adminMain || users[0] || null;
+      });
+      setIsAdmin(true);
       showToast('Akun berhasil dihapus dari sistem', 'info');
     } catch (err) {
       console.error('Delete account error:', err);
@@ -200,29 +208,54 @@ export default function App() {
     );
   }
 
-  // Handlers
-  const handleDateChange = async (newDateInfo: ReportDateInfo) => {
-    const updated: DailyReportData = {
-      ...reportData,
-      id: `report-${newDateInfo.isoDate}`,
-      dateInfo: newDateInfo,
+  // Helper to ensure any operational update (sites, packages, genset, categories, etc.)
+  // updates the dashboard data while permanently preserving the Preview Laporan WhatsApp text
+  const applyDashboardUpdate = async (
+    dataUpdater: (prev: DailyReportData) => DailyReportData,
+    toastMsg?: { message: string; type?: 'success' | 'error' | 'info' }
+  ) => {
+    const updated = dataUpdater(reportData);
+    
+    // User request: "ketika ada peruabahan/di perbarui dari WebApp , untuk Preview Laporan WhatsApp tidak berubah dan tersimpan secara otomatis dan permanen"
+    const savedCustomReport = reportData.customWhatsAppReport || 
+      localStorage.getItem(`depotel_custom_wa_${reportData.id}`) || 
+      undefined;
+
+    const cleanUpdated: DailyReportData = {
+      ...updated,
+      customWhatsAppReport: savedCustomReport,
       updatedAt: new Date().toISOString(),
     };
-    await persistChanges(updated);
-    showToast(`Tanggal laporan diperbarui: ${newDateInfo.formatted}`, 'success');
+
+    await persistChanges(cleanUpdated);
+    if (toastMsg) {
+      showToast(toastMsg.message, toastMsg.type || 'success');
+    }
+  };
+
+  // Handlers
+  const handleDateChange = async (newDateInfo: ReportDateInfo) => {
+    await applyDashboardUpdate(
+      (prev) => ({
+        ...prev,
+        id: `report-${newDateInfo.isoDate}`,
+        dateInfo: newDateInfo,
+      }),
+      { message: `Tanggal laporan diperbarui: ${newDateInfo.formatted}` }
+    );
   };
 
   const handleSaveCategory = async (updatedCat: JobCategory) => {
     const newCategories = reportData.categories.map((c) =>
       c.id === updatedCat.id ? updatedCat : c
     );
-    const updated: DailyReportData = {
-      ...reportData,
-      categories: newCategories,
-      updatedAt: new Date().toISOString(),
-    };
-    await persistChanges(updated);
-    showToast('Data laporan utama berhasil diperbarui', 'success');
+    await applyDashboardUpdate(
+      (prev) => ({
+        ...prev,
+        categories: newCategories,
+      }),
+      { message: 'Data laporan utama berhasil diperbarui' }
+    );
   };
 
   // Team Handlers
@@ -249,7 +282,6 @@ export default function App() {
             }
           : t
       );
-      showToast('Data team berhasil diperbarui', 'success');
     } else {
       // Create new team
       const newTeam: TeamData = {
@@ -260,31 +292,25 @@ export default function App() {
         sites: [],
       };
       newTeams.push(newTeam);
-      showToast('Team baru berhasil ditambahkan', 'success');
     }
 
     // Sort by teamNumber
     newTeams.sort((a, b) => a.teamNumber - b.teamNumber);
 
-    const updated: DailyReportData = {
-      ...reportData,
-      teams: newTeams,
-      updatedAt: new Date().toISOString(),
-    };
-    await persistChanges(updated);
+    await applyDashboardUpdate(
+      (prev) => ({ ...prev, teams: newTeams }),
+      { message: teamInfo.id ? 'Data team berhasil diperbarui' : 'Team baru berhasil ditambahkan' }
+    );
   };
 
   const handleDeleteTeam = async (teamId: string) => {
     const targetTeam = reportData.teams.find((t) => t.id === teamId);
     if (confirm(`Apakah Anda yakin ingin menghapus Team ${targetTeam?.name || ''}?`)) {
       const newTeams = reportData.teams.filter((t) => t.id !== teamId);
-      const updated: DailyReportData = {
-        ...reportData,
-        teams: newTeams,
-        updatedAt: new Date().toISOString(),
-      };
-      await persistChanges(updated);
-      showToast('Team berhasil dihapus', 'success');
+      await applyDashboardUpdate(
+        (prev) => ({ ...prev, teams: newTeams }),
+        { message: 'Team berhasil dihapus' }
+      );
     }
   };
 
@@ -371,13 +397,10 @@ export default function App() {
       return { ...t, sites: newSites };
     });
 
-    const updated: DailyReportData = {
-      ...reportData,
-      teams: newTeams,
-      updatedAt: new Date().toISOString(),
-    };
-    await persistChanges(updated);
-    showToast(sitePackage ? 'Paket Site berhasil diperbarui' : 'Paket Site baru berhasil ditambahkan', 'success');
+    await applyDashboardUpdate(
+      (prev) => ({ ...prev, teams: newTeams }),
+      { message: sitePackage ? 'Paket Site berhasil diperbarui' : 'Paket Site baru berhasil ditambahkan' }
+    );
   };
 
   const handleDeletePackage = async (teamId: string, packageId: string) => {
@@ -399,13 +422,10 @@ export default function App() {
       };
     });
 
-    const updated: DailyReportData = {
-      ...reportData,
-      teams: newTeams,
-      updatedAt: new Date().toISOString(),
-    };
-    await persistChanges(updated);
-    showToast('Paket Site berhasil dihapus', 'success');
+    await applyDashboardUpdate(
+      (prev) => ({ ...prev, teams: newTeams }),
+      { message: 'Paket Site berhasil dihapus' }
+    );
   };
 
   const handleStatusChange = async (teamId: string, siteId: string, newStatus: SiteStatus) => {
@@ -417,13 +437,10 @@ export default function App() {
       };
     });
 
-    const updated: DailyReportData = {
-      ...reportData,
-      teams: newTeams,
-      updatedAt: new Date().toISOString(),
-    };
-    await persistChanges(updated);
-    showToast('Status item diperbarui', 'success');
+    await applyDashboardUpdate(
+      (prev) => ({ ...prev, teams: newTeams }),
+      { message: 'Status item diperbarui' }
+    );
   };
 
   const handleUpdatePackageNote = async (teamId: string, packageId: string, noteText: string) => {
@@ -440,13 +457,10 @@ export default function App() {
       };
     });
 
-    const updated: DailyReportData = {
-      ...reportData,
-      teams: newTeams,
-      updatedAt: new Date().toISOString(),
-    };
-    await persistChanges(updated);
-    showToast('Keterangan Note site diperbarui', 'success');
+    await applyDashboardUpdate(
+      (prev) => ({ ...prev, teams: newTeams }),
+      { message: 'Keterangan Note site diperbarui' }
+    );
   };
 
   // Handler for Closed Unified Package (Calculates PM SITE & SPACE TOWER together)
@@ -501,17 +515,13 @@ export default function App() {
       };
     });
 
-    const updated: DailyReportData = {
-      ...reportData,
-      categories: updatedCategories,
-      teams: newTeams,
-      updatedAt: closedDateStr,
-    };
-
-    await persistChanges(updated);
-    showToast(
-      `Paket '${pkgName}' Closed! Data Laporan Utama (PM Site & Tower Space) bertambah +1`,
-      'success'
+    await applyDashboardUpdate(
+      (prev) => ({
+        ...prev,
+        categories: updatedCategories,
+        teams: newTeams,
+      }),
+      { message: `Paket '${pkgName}' Closed! Data Laporan Utama (PM Site & Tower Space) bertambah +1` }
     );
   };
 
@@ -554,15 +564,14 @@ export default function App() {
       };
     });
 
-    const updated: DailyReportData = {
-      ...reportData,
-      categories: updatedCategories,
-      teams: newTeams,
-      updatedAt: new Date().toISOString(),
-    };
-
-    await persistChanges(updated);
-    showToast('Paket Site Closed berhasil dihapus', 'success');
+    await applyDashboardUpdate(
+      (prev) => ({
+        ...prev,
+        categories: updatedCategories,
+        teams: newTeams,
+      }),
+      { message: 'Paket Site Closed berhasil dihapus' }
+    );
   };
 
   // Genset Fix Handlers
@@ -575,48 +584,36 @@ export default function App() {
         status,
       },
     ];
-    const updated: DailyReportData = {
-      ...reportData,
-      gensetFixSites: newSites,
-      updatedAt: new Date().toISOString(),
-    };
-    await persistChanges(updated);
-    showToast('Site Genset Fix berhasil ditambahkan', 'success');
+    await applyDashboardUpdate(
+      (prev) => ({ ...prev, gensetFixSites: newSites }),
+      { message: 'Site Genset Fix berhasil ditambahkan' }
+    );
   };
 
   const handleEditGensetSite = async (siteId: string, siteName: string, status: SiteStatus) => {
     const newSites = reportData.gensetFixSites.map((g) =>
       g.id === siteId ? { ...g, siteName, status } : g
     );
-    const updated: DailyReportData = {
-      ...reportData,
-      gensetFixSites: newSites,
-      updatedAt: new Date().toISOString(),
-    };
-    await persistChanges(updated);
-    showToast('Site Genset Fix berhasil diperbarui', 'success');
+    await applyDashboardUpdate(
+      (prev) => ({ ...prev, gensetFixSites: newSites }),
+      { message: 'Site Genset Fix berhasil diperbarui' }
+    );
   };
 
   const handleDeleteGensetSite = async (siteId: string) => {
     const newSites = reportData.gensetFixSites.filter((g) => g.id !== siteId);
-    const updated: DailyReportData = {
-      ...reportData,
-      gensetFixSites: newSites,
-      updatedAt: new Date().toISOString(),
-    };
-    await persistChanges(updated);
-    showToast('Site Genset Fix berhasil dihapus', 'success');
+    await applyDashboardUpdate(
+      (prev) => ({ ...prev, gensetFixSites: newSites }),
+      { message: 'Site Genset Fix berhasil dihapus' }
+    );
   };
 
   // Note Handler
   const handleSaveNote = async (newNote: string) => {
-    const updated: DailyReportData = {
-      ...reportData,
-      note: newNote,
-      updatedAt: new Date().toISOString(),
-    };
-    await persistChanges(updated);
-    showToast('Catatan laporan berhasil diperbarui', 'success');
+    await applyDashboardUpdate(
+      (prev) => ({ ...prev, note: newNote }),
+      { message: 'Catatan laporan berhasil diperbarui' }
+    );
   };
 
   // Reset Handler

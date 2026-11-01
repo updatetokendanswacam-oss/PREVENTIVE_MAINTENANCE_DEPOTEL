@@ -1,0 +1,123 @@
+{
+  "currentDashboard": {
+    "id": "report-2026-11-01",
+    "dateInfo": {
+      "isoDate": "2026-11-01",
+      "dayName": "SUN",
+      "displayDate": "01/11/2026",
+      "formatted": "SUN, 01/11/2026"
+    },
+    "categories": [
+      {
+        "id": "nop_southern",
+        "title": "PM SITE NOP SOUTHERN",
+        "target": 0,
+        "achievement": 0,
+        "remaining": 0,
+        "percentage": 100
+      },
+      {
+        "id": "pm_genset",
+        "title": "PM GENSET",
+        "target": 0,
+        "achievement": 0,
+        "remaining": 0,
+        "percentage": 100
+      },
+      {
+        "id": "space_tower",
+        "title": "SPACE TOWER",
+        "target": 0,
+        "achievement": 0,
+        "remaining": 0,
+        "percentage": 100
+      }
+    ],
+    "teams": [
+      {
+        "id": "team-1",
+        "teamNumber": 1,
+        "name": "SAMIN",
+        "phone": "082374227775",
+        "sites": []
+      },
+      {
+        "id": "team-2",
+        "teamNumber": 2,
+        "name": "MUHAMAD JUNAEDI",
+        "phone": "08119234976",
+        "sites": []
+      },
+      {
+        "id": "team-3",
+        "teamNumber": 3,
+        "name": "RANDI AFDIANSYAH",
+        "phone": "08131423533",
+        "sites": []
+      },
+      {
+        "id": "team-4",
+        "teamNumber": 4,
+        "name": "KOSASIH",
+        "phone": "08119234974",
+        "sites": []
+      },
+      {
+        "id": "team-5",
+        "teamNumber": 5,
+        "name": "ROMI HENDRA GUNAWAN",
+        "phone": "081319012052",
+        "sites": []
+      },
+      {
+        "id": "team-6",
+        "teamNumber": 6,
+        "name": "ROY ISHARRYANTO",
+        "phone": "081286241842",
+        "sites": []
+      }
+    ],
+    "gensetFixSites": [],
+    "note": "",
+    "updatedAt": "2026-11-01T09:11:43.323Z"
+  },
+  "history": [],
+  "adminPin": "1234",
+  "users": [
+    {
+      "id": "acc-admin-main",
+      "name": "ADMIN DEPOTEL UTAMA",
+      "email": "updatetokendanswacam@gmail.com",
+      "role": "ROLE_ADMIN",
+      "status": "AKTIF",
+      "isGoogleConnected": true,
+      "avatarUrl": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face",
+      "department": "Operations & Management DEPOTEL",
+      "createdAt": "2026-11-01T07:54:51.573Z",
+      "lastLoginAt": "2026-11-01T07:54:51.573Z"
+    },
+    {
+      "id": "acc-user-field",
+      "name": "USER OPERASIONAL NOP",
+      "email": "field.depotel@gmail.com",
+      "role": "ROLE_USER",
+      "status": "AKTIF",
+      "isGoogleConnected": true,
+      "department": "Team Lapangan Southern",
+      "createdAt": "2026-11-01T07:54:51.573Z",
+      "lastLoginAt": "2026-11-01T07:54:51.573Z"
+    },
+    {
+      "id": "acc-1793522436599",
+      "name": "Muhamad Junaedi",
+      "email": "muhamadjunaedi057@gmail.com",
+      "role": "ROLE_ADMIN",
+      "status": "AKTIF",
+      "isGoogleConnected": true,
+      "department": "Admin Team",
+      "createdAt": "2026-11-01T08:40:36.599Z",
+      "lastLoginAt": "2026-11-01T08:40:36.599Z"
+    }
+  ],
+  "activeUserId": "acc-admin-main"
+}
