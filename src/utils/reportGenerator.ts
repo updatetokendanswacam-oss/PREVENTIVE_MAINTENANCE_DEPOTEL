@@ -81,7 +81,6 @@ export function generateWhatsAppReport(data: DailyReportData): string {
     lines.push('Site List:');
 
     const { activePackages, closedPackages } = groupSitesIntoPackages(team.sites);
-    const siteLines: string[] = [];
 
     // Sort closed packages chronologically by closed timestamp
     const sortedClosedPackages = [...closedPackages].sort((a, b) => {
@@ -90,16 +89,8 @@ export function generateWhatsAppReport(data: DailyReportData): string {
       return timeA - timeB;
     });
 
-    // Rule:
-    // 1. If team has active packages, show ONLY the latest active package (site 2 replaces site 1 like new, never double site)
-    // 2. If team has no active package, show ONLY the latest closed package (replaces previous closed site, avoiding double site)
-    // 3. If no second site is added, the first closed site remains visible in WhatsApp update!
-    let packagesToDisplay: typeof activePackages = [];
-    if (activePackages.length > 0) {
-      packagesToDisplay = [activePackages[activePackages.length - 1]];
-    } else if (sortedClosedPackages.length > 0) {
-      packagesToDisplay = [sortedClosedPackages[sortedClosedPackages.length - 1]];
-    }
+    // Display ALL site packages added to this team (both active and closed) so Preview shows all sites for each team
+    const packagesToDisplay = [...activePackages, ...sortedClosedPackages];
 
     if (packagesToDisplay.length === 0) {
       lines.push('- Tidak ada site -');
