@@ -99,17 +99,17 @@ export function generateWhatsAppReport(data: DailyReportData): string {
       packagesToDisplay.forEach((pkg) => {
         // 1. Site item line
         const siteText = pkg.siteItem?.text || pkg.siteItem?.siteName || 'Site';
-        const siteStatus = pkg.isClosed ? 'DONE' : (pkg.siteItem?.status || 'PROGRESS');
+        const siteStatus = pkg.siteItem?.status || (pkg.isClosed ? 'DONE' : 'PROGRESS');
         lines.push(`${itemNumber++}. ${formatSiteLine(siteText, siteStatus)}`);
 
         // 2. SPACE TOWER item line
         const towerText = pkg.towerItem?.text || 'Tower space';
-        const towerStatus = pkg.isClosed ? 'DONE' : (pkg.towerItem?.status || 'UNCHECKED');
+        const towerStatus = pkg.towerItem?.status || (pkg.isClosed ? 'DONE' : 'UNCHECKED');
         lines.push(`${itemNumber++}. ${formatSiteLine(towerText, towerStatus)}`);
 
         // 3. CEK EAS item line
         const easText = pkg.easItem?.text || 'EAS';
-        const easStatus = pkg.isClosed ? 'DONE' : (pkg.easItem?.status || 'UNCHECKED');
+        const easStatus = pkg.easItem?.status || (pkg.isClosed ? 'DONE' : 'UNCHECKED');
         lines.push(`${itemNumber++}. ${formatSiteLine(easText, easStatus)}`);
 
         // Note under item 3. CEK EAS

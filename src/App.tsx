@@ -640,7 +640,7 @@ export default function App() {
         ...pkg.siteItem,
         packageId: pkg.packageId,
         isClosed: true,
-        status: 'DONE',
+        status: pkg.siteItem?.status || 'DONE',
         closedAt: closedDateStr,
         closedCategoryTitle: 'PM SITE NOP & SPACE TOWER',
       };
@@ -652,7 +652,7 @@ export default function App() {
         packageRole: 'tower',
         text: pkg.towerItem?.text || 'Tower space',
         isClosed: true,
-        status: 'DONE',
+        status: pkg.towerItem?.status || 'DONE',
         closedAt: closedDateStr,
       };
 
@@ -663,7 +663,7 @@ export default function App() {
         packageRole: 'eas',
         text: pkg.easItem?.text || 'EAS',
         isClosed: true,
-        status: 'DONE',
+        status: pkg.easItem?.status || 'DONE',
         closedAt: closedDateStr,
       };
 
