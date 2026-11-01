@@ -318,35 +318,23 @@ export default function App() {
     const updated = dataUpdater(reportData);
     const lockKey = `depotel_custom_wa_is_edited_${reportData.id}`;
 
+    const isCustomLocked =
+      reportData.isCustomWhatsAppEdited === true ||
+      localStorage.getItem(lockKey) === 'true';
+
+    const savedCustomReport =
+      reportData.customWhatsAppReport ||
+      localStorage.getItem(`depotel_custom_wa_${reportData.id}`) ||
+      localStorage.getItem('depotel_custom_wa_permanent_latest');
+
     let newWhatsAppText: string;
-    let isCustomLocked = false;
 
-    if (regenerateWhatsApp) {
-      // User request: "ketika di tambahkan site di Preview Laporan WhatsApp akan tertambah sesuai list site"
-      // When explicitly regenerating (e.g. adding a new site), clear custom lock so newly added site appears in WhatsApp preview!
-      try {
-        localStorage.removeItem(lockKey);
-        localStorage.removeItem('depotel_custom_wa_permanent_latest');
-        localStorage.removeItem(`depotel_custom_wa_${reportData.id}`);
-      } catch (e) {
-        console.warn('Storage clear lock error', e);
-      }
-      newWhatsAppText = generateWhatsAppReport(updated);
-      isCustomLocked = false;
+    if (isCustomLocked && savedCustomReport && savedCustomReport.trim().length > 0) {
+      // User request: "FORMAT PESAN WHATSAPP ketika di edit dan lalu di simpan ketika di simpan akan bener2 tersimpan secara permanen tidak berubah lagi format untuk whatsapp nya"
+      // Strictly preserve permanently saved custom WhatsApp report format across ALL dashboard updates!
+      newWhatsAppText = savedCustomReport;
     } else {
-      // User request: "ketika di closed list site tim pada Preview Laporan WhatsApp akan tetap sama dan tidak merubah secara otomatis"
-      isCustomLocked =
-        reportData.isCustomWhatsAppEdited === true ||
-        localStorage.getItem(lockKey) === 'true';
-
-      const savedCustomReport =
-        reportData.customWhatsAppReport ||
-        localStorage.getItem(`depotel_custom_wa_${reportData.id}`);
-
-      // Keep exact previous WhatsApp report text so CLOSED action NEVER alters or regenerates WhatsApp report!
-      newWhatsAppText = (savedCustomReport && savedCustomReport.trim().length > 0)
-        ? savedCustomReport
-        : generateWhatsAppReport(reportData);
+      newWhatsAppText = generateWhatsAppReport(updated);
     }
 
     try {
