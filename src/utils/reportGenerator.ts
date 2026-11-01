@@ -91,12 +91,12 @@ export function generateWhatsAppReport(data: DailyReportData): string {
     });
 
     // Rule:
-    // 1. If team has active packages, show all active packages (newly added sites appear in WhatsApp update, replacing old closed sites)
+    // 1. If team has active packages, show ONLY the latest active package (site 2 replaces site 1 like new, never double site)
     // 2. If team has no active package, show ONLY the latest closed package (replaces previous closed site, avoiding double site)
     // 3. If no second site is added, the first closed site remains visible in WhatsApp update!
     let packagesToDisplay: typeof activePackages = [];
     if (activePackages.length > 0) {
-      packagesToDisplay = activePackages;
+      packagesToDisplay = [activePackages[activePackages.length - 1]];
     } else if (sortedClosedPackages.length > 0) {
       packagesToDisplay = [sortedClosedPackages[sortedClosedPackages.length - 1]];
     }

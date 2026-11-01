@@ -209,21 +209,30 @@ export default function App() {
   }
 
   // Helper to ensure any operational update (sites, packages, genset, categories, etc.)
-  // updates the dashboard data while permanently preserving the Preview Laporan WhatsApp text
+  // updates the dashboard data and automatically regenerates and permanently saves the WhatsApp report
   const applyDashboardUpdate = async (
     dataUpdater: (prev: DailyReportData) => DailyReportData,
-    toastMsg?: { message: string; type?: 'success' | 'error' | 'info' }
+    toastMsg?: { message: string; type?: 'success' | 'error' | 'info' },
+    regenerateWhatsApp: boolean = true
   ) => {
     const updated = dataUpdater(reportData);
     
-    // User request: "ketika ada peruabahan/di perbarui dari WebApp , untuk Preview Laporan WhatsApp tidak berubah dan tersimpan secara otomatis dan permanen"
-    const savedCustomReport = reportData.customWhatsAppReport || 
-      localStorage.getItem(`depotel_custom_wa_${reportData.id}`) || 
-      undefined;
+    // User request: "ketika ada penambahan site di list tim yang pertama untuk Preview Laporan WhatsApp akan berubah sesuai dengan yang di tambahkan, ketika menambahkan list site yang ke dua yang pertama akan terganti seperti baru lagi, jangan bikin list site dobel sesuaikan dengan otomatis"
+    const newWhatsAppText = regenerateWhatsApp
+      ? generateWhatsAppReport(updated)
+      : (reportData.customWhatsAppReport || 
+         localStorage.getItem(`depotel_custom_wa_${reportData.id}`) || 
+         generateWhatsAppReport(updated));
+
+    try {
+      localStorage.setItem(`depotel_custom_wa_${reportData.id}`, newWhatsAppText);
+    } catch (e) {
+      console.warn('Storage save error', e);
+    }
 
     const cleanUpdated: DailyReportData = {
       ...updated,
-      customWhatsAppReport: savedCustomReport,
+      customWhatsAppReport: newWhatsAppText,
       updatedAt: new Date().toISOString(),
     };
 
@@ -391,6 +400,9 @@ export default function App() {
         newSites = newSites.filter((s) => !oldIds.has(s.id) && s.packageId !== pkgId);
         newSites.push(siteItem, towerItem, easItem);
       } else {
+        // User request: "ketika menambahkan list site yang ke dua yang pertama akan terganti seperti baru lagi, jangan bikin list site dobel sesuaikan dengan otomatis"
+        // Retain closed sites, replace previous active site so active sites do NOT double up!
+        newSites = newSites.filter((s) => s.isClosed);
         newSites.push(siteItem, towerItem, easItem);
       }
 
@@ -399,7 +411,8 @@ export default function App() {
 
     await applyDashboardUpdate(
       (prev) => ({ ...prev, teams: newTeams }),
-      { message: sitePackage ? 'Paket Site berhasil diperbarui' : 'Paket Site baru berhasil ditambahkan' }
+      { message: sitePackage ? 'Paket Site berhasil diperbarui' : 'Paket Site baru berhasil ditambahkan' },
+      true
     );
   };
 

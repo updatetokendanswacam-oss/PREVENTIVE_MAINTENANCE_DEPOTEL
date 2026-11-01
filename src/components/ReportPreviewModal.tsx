@@ -88,7 +88,7 @@ export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({
       }
     }
     setIsEditing(false);
-  }, [isOpen, reportData.id]);
+  }, [isOpen, reportData.id, reportData.customWhatsAppReport]);
 
   const handleStartEdit = () => {
     setDraftText(currentText);
