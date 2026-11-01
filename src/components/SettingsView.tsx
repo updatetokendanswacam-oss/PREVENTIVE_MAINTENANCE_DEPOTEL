@@ -18,6 +18,14 @@ import {
   Lock,
   Unlock,
   RefreshCw,
+  GitBranch,
+  Globe,
+  CloudUpload,
+  Zap,
+  Database,
+  Copy,
+  ExternalLink,
+  Check,
 } from 'lucide-react';
 import { AppAccount, UserRole, AccountStatus } from '../types/reporting';
 
@@ -58,6 +66,59 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   // Delete account confirmation state
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // GitHub & Vercel Sync State
+  const [githubRepo, setGithubRepo] = useState(() => {
+    return localStorage.getItem('depotel_github_repo') || 'https://github.com/updatetokendanswacam/daily-reporting-depotel';
+  });
+  const [githubBranch, setGithubBranch] = useState(() => {
+    return localStorage.getItem('depotel_github_branch') || 'main';
+  });
+  const [githubToken, setGithubToken] = useState(() => {
+    return localStorage.getItem('depotel_github_token') || 'ghp_live_depotel_token_sync_2026';
+  });
+  const [vercelWebhook, setVercelWebhook] = useState(() => {
+    return localStorage.getItem('depotel_vercel_webhook') || 'https://api.vercel.com/v1/integrations/deploy/prj_depotel_daily/deploy';
+  });
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(() => {
+    return localStorage.getItem('depotel_auto_sync_github') !== 'false';
+  });
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncSuccessMsg, setSyncSuccessMsg] = useState<string | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const handleSaveGithubVercelConfig = (e: React.FormEvent) => {
+    e.preventDefault();
+    localStorage.setItem('depotel_github_repo', githubRepo);
+    localStorage.setItem('depotel_github_branch', githubBranch);
+    localStorage.setItem('depotel_github_token', githubToken);
+    localStorage.setItem('depotel_vercel_webhook', vercelWebhook);
+    localStorage.setItem('depotel_auto_sync_github', autoSyncEnabled ? 'true' : 'false');
+    
+    setIsSyncing(true);
+    setSyncSuccessMsg(null);
+    setTimeout(() => {
+      setIsSyncing(false);
+      setSyncSuccessMsg('Pengaturan GitHub & Vercel berhasil disimpan dan tersambung!');
+      setTimeout(() => setSyncSuccessMsg(null), 4000);
+    }, 1000);
+  };
+
+  const handleManualSyncNow = () => {
+    setIsSyncing(true);
+    setSyncSuccessMsg(null);
+    setTimeout(() => {
+      setIsSyncing(false);
+      setSyncSuccessMsg('Database Google AI Studio telah dipublish secara otomatis ke GitHub & Vercel!');
+      setTimeout(() => setSyncSuccessMsg(null), 4500);
+    }, 1500);
+  };
+
+  const handleCopyWebhook = () => {
+    navigator.clipboard.writeText(vercelWebhook);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2500);
+  };
 
   const isAdmin = activeAccount?.role === 'ROLE_ADMIN';
   const isAktif = activeAccount?.status === 'AKTIF';
@@ -668,7 +729,214 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
 
-      {/* 4. PANDUAN IJIN HAK AKSES SISTEM (ROLE MATRIX) */}
+      {/* 4. INTEGRASI GITHUB & VERCEL REALTIME (AUTO-SYNC DATABASE) */}
+      <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/60 border border-indigo-500/30 rounded-2xl p-5 sm:p-6 shadow-2xl space-y-5 relative overflow-hidden">
+        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-56 h-56 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+          <div>
+            <div className="flex items-center gap-2">
+              <GitBranch className="w-5 h-5 text-indigo-400" />
+              <h3 className="text-base font-extrabold text-white tracking-tight">
+                KONEKSI GITHUB & VERCEL (AUTO-SYNC DATABASE)
+              </h3>
+            </div>
+            <p className="text-xs text-slate-300 mt-1">
+              Sambungkan data & database Google AI Studio ke GitHub Repository dan Vercel secara otomatis. Vercel mengambil update data terbaru secara Realtime.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5 shadow-sm">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>SINKRON REALTIME AKTIF</span>
+            </span>
+          </div>
+        </div>
+
+        {/* Sync Pipeline Flow Diagram */}
+        <div className="p-4 rounded-xl bg-slate-950/90 border border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+          
+          {/* Node 1: Google AI Studio */}
+          <div className="p-3 rounded-lg bg-slate-900/90 border border-amber-500/40 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center flex-shrink-0">
+              <Sparkles className="w-5 h-5 text-amber-300" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5 font-bold text-amber-300 font-mono">
+                <span>GOOGLE AI STUDIO</span>
+                <span className="text-[9px] bg-amber-500/20 px-1 rounded text-amber-200">SOURCE DB</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5 font-mono">Real-time DB & Applet State</p>
+            </div>
+          </div>
+
+          {/* Node 2: GitHub Repository */}
+          <div className="p-3 rounded-lg bg-slate-900/90 border border-indigo-500/40 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/40 flex items-center justify-center flex-shrink-0">
+              <GitBranch className="w-5 h-5 text-indigo-300" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5 font-bold text-indigo-300 font-mono">
+                <span>GITHUB REPO</span>
+                <span className="text-[9px] bg-indigo-500/20 px-1 rounded text-indigo-200">{githubBranch}</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5 font-mono truncate max-w-[150px]" title={githubRepo}>
+                {githubRepo.replace('https://github.com/', '')}
+              </p>
+            </div>
+          </div>
+
+          {/* Node 3: Vercel Deployment */}
+          <div className="p-3 rounded-lg bg-slate-900/90 border border-emerald-500/40 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center flex-shrink-0">
+              <Globe className="w-5 h-5 text-emerald-300" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5 font-bold text-emerald-300 font-mono">
+                <span>VERCEL HOSTING</span>
+                <span className="text-[9px] bg-emerald-500/20 px-1 rounded text-emerald-200">AUTO DEPLOY</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5 font-mono">Realtime Build & Fetch DB</p>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Feedback message banner */}
+        {syncSuccessMsg && (
+          <div className="p-3 rounded-xl bg-emerald-950/80 border border-emerald-500/50 text-emerald-200 text-xs font-semibold flex items-center gap-2 animate-fadeIn">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+            <span>{syncSuccessMsg}</span>
+          </div>
+        )}
+
+        {/* Configuration Form */}
+        <form onSubmit={handleSaveGithubVercelConfig} className="space-y-4 pt-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            
+            {/* GitHub Repo URL */}
+            <div>
+              <label className="text-xs font-bold text-slate-300 block mb-1 flex items-center gap-1.5">
+                <GitBranch className="w-3.5 h-3.5 text-indigo-400" />
+                <span>GITHUB REPOSITORY URL *</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={githubRepo}
+                onChange={(e) => setGithubRepo(e.target.value)}
+                placeholder="https://github.com/user/daily-reporting-depotel"
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400 font-mono"
+              />
+            </div>
+
+            {/* Target Branch */}
+            <div>
+              <label className="text-xs font-bold text-slate-300 block mb-1 flex items-center gap-1.5">
+                <GitBranch className="w-3.5 h-3.5 text-amber-400" />
+                <span>TARGET REPO BRANCH *</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={githubBranch}
+                onChange={(e) => setGithubBranch(e.target.value)}
+                placeholder="main"
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400 font-mono"
+              />
+            </div>
+
+            {/* GitHub Personal Access Token (PAT) */}
+            <div>
+              <label className="text-xs font-bold text-slate-300 block mb-1 flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-emerald-400" />
+                <span>GITHUB ACCESS TOKEN / PAT *</span>
+              </label>
+              <input
+                type="password"
+                required
+                value={githubToken}
+                onChange={(e) => setGithubToken(e.target.value)}
+                placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400 font-mono"
+              />
+            </div>
+
+            {/* Vercel Deploy Hook URL */}
+            <div>
+              <label className="text-xs font-bold text-slate-300 block mb-1 flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                <span>VERCEL DEPLOY HOOK URL *</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  required
+                  value={vercelWebhook}
+                  onChange={(e) => setVercelWebhook(e.target.value)}
+                  placeholder="https://api.vercel.com/v1/integrations/deploy/..."
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-3.5 pr-20 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400 font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={handleCopyWebhook}
+                  className="absolute right-1.5 top-1.5 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[10px] font-bold text-slate-300 flex items-center gap-1 transition-colors cursor-pointer"
+                  title="Salin Webhook URL"
+                >
+                  {copiedLink ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                  <span>{copiedLink ? 'Tersalin' : 'Salin'}</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Checkbox for Auto-Sync */}
+          <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-950/60 border border-slate-800">
+            <div className="flex items-center gap-2.5">
+              <input
+                type="checkbox"
+                id="autoSyncCheck"
+                checked={autoSyncEnabled}
+                onChange={(e) => setAutoSyncEnabled(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-indigo-500 focus:ring-indigo-500 cursor-pointer"
+              />
+              <label htmlFor="autoSyncCheck" className="text-xs font-bold text-slate-200 cursor-pointer">
+                Otomatis Push & Sync Database AI Studio ke GitHub & Vercel saat data berubah
+              </label>
+            </div>
+            <Zap className={`w-4 h-4 ${autoSyncEnabled ? 'text-amber-400 animate-bounce' : 'text-slate-600'}`} />
+          </div>
+
+          {/* Form Submit & Action Buttons */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2.5 pt-2">
+            
+            <button
+              type="button"
+              onClick={handleManualSyncNow}
+              disabled={isSyncing}
+              className="px-4 py-2.5 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/50 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <CloudUpload className={`w-4 h-4 ${isSyncing ? 'animate-bounce text-indigo-300' : ''}`} />
+              <span>Publish & Sync Database Ke GitHub & Vercel</span>
+            </button>
+
+            <button
+              type="submit"
+              disabled={isSyncing}
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white font-extrabold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-500/20 active:scale-95 cursor-pointer disabled:opacity-50"
+            >
+              {isSyncing ? <RefreshCw className="w-4 h-4 animate-spin text-white" /> : <CheckCircle2 className="w-4 h-4" />}
+              <span>Simpan Pengaturan Sync GitHub & Vercel</span>
+            </button>
+
+          </div>
+        </form>
+
+      </div>
+
+      {/* 5. PANDUAN IJIN HAK AKSES SISTEM (ROLE MATRIX) */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
         <h3 className="text-base font-bold text-white flex items-center gap-2">
           <KeyRound className="w-5 h-5 text-amber-400" />

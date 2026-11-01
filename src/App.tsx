@@ -527,7 +527,8 @@ export default function App() {
 
     await applyDashboardUpdate(
       (prev) => ({ ...prev, teams: newTeams }),
-      { message: 'Paket Site berhasil dihapus' }
+      { message: 'Paket Site berhasil dihapus' },
+      true
     );
   };
 
@@ -542,7 +543,8 @@ export default function App() {
 
     await applyDashboardUpdate(
       (prev) => ({ ...prev, teams: newTeams }),
-      { message: 'Status item diperbarui' }
+      { message: 'Status item diperbarui' },
+      true
     );
   };
 
@@ -562,7 +564,8 @@ export default function App() {
 
     await applyDashboardUpdate(
       (prev) => ({ ...prev, teams: newTeams }),
-      { message: 'Keterangan Note site diperbarui' }
+      { message: 'Keterangan Note site diperbarui' },
+      true
     );
   };
 
