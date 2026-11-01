@@ -321,7 +321,7 @@ export default function App() {
       newWhatsAppText = generateWhatsAppReport(updated);
       isCustomLocked = false;
     } else {
-      // User request: "ketika di closed list site akan tersimpan dan tidak merubah otomatis lagi ke Preview Laporan WhatsApp"
+      // User request: "ketika di closed list site tim pada Preview Laporan WhatsApp akan tetap sama dan tidak merubah secara otomatis"
       isCustomLocked =
         reportData.isCustomWhatsAppEdited === true ||
         localStorage.getItem(lockKey) === 'true';
@@ -330,9 +330,10 @@ export default function App() {
         reportData.customWhatsAppReport ||
         localStorage.getItem(`depotel_custom_wa_${reportData.id}`);
 
+      // Keep exact previous WhatsApp report text so CLOSED action NEVER alters or regenerates WhatsApp report!
       newWhatsAppText = (savedCustomReport && savedCustomReport.trim().length > 0)
         ? savedCustomReport
-        : (reportData.customWhatsAppReport || generateWhatsAppReport(updated));
+        : generateWhatsAppReport(reportData);
     }
 
     try {
