@@ -78,7 +78,7 @@ function loadDatabase(): DatabaseStructure {
       const users = Array.isArray(parsed.users)
         ? parsed.users
         : DEFAULT_ACCOUNTS;
-      const activeUserId = parsed.activeUserId || users[0].id;
+      const activeUserId = parsed.activeUserId || (users[0] ? users[0].id : 'acc-admin-main');
 
       return {
         currentDashboard: parsed.currentDashboard || null,
@@ -91,13 +91,15 @@ function loadDatabase(): DatabaseStructure {
   } catch (error) {
     console.error('Failed to read database file:', error);
   }
-  return {
+  const defaultDb: DatabaseStructure = {
     currentDashboard: null,
     history: [],
     adminPin: '1234',
     users: DEFAULT_ACCOUNTS,
     activeUserId: DEFAULT_ACCOUNTS[0].id,
   };
+  saveDatabase(defaultDb);
+  return defaultDb;
 }
 
 function saveDatabase(db: DatabaseStructure) {
@@ -342,8 +344,11 @@ async function startServer() {
   apiRouter.delete('/users/:id', (req: Request, res: Response) => {
     const { id } = req.params;
     const db = loadDatabase();
+    const cleanId = decodeURIComponent(id).trim().toLowerCase();
 
-    const targetUser = db.users.find((u) => u.id === id);
+    const targetUser = db.users.find(
+      (u) => u.id === id || u.id.toLowerCase() === cleanId || u.email.toLowerCase() === cleanId
+    );
     if (!targetUser) {
       res.status(404).json({ success: false, error: 'Akun tidak ditemukan di database' });
       return;
@@ -359,13 +364,20 @@ async function startServer() {
       return;
     }
 
-    db.users = db.users.filter((u) => u.id !== id);
-    if (db.activeUserId === id) {
+    db.users = db.users.filter(
+      (u) => u.id !== targetUser.id && u.email.toLowerCase() !== targetUser.email.toLowerCase()
+    );
+    if (db.activeUserId === targetUser.id) {
       const adminMain = db.users.find((u) => u.id === 'acc-admin-main') || db.users[0];
-      db.activeUserId = adminMain.id;
+      db.activeUserId = adminMain ? adminMain.id : '';
     }
     saveDatabase(db);
-    res.json({ success: true, message: `Akun ${targetUser.name} berhasil dihapus permanen` });
+    res.json({
+      success: true,
+      message: `Akun ${targetUser.name} berhasil dihapus permanen`,
+      users: db.users,
+      activeUserId: db.activeUserId,
+    });
   });
 
   // GET /api/sites (Read attached Telkomsel Site CSV or fallback to remote)

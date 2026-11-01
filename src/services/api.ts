@@ -302,7 +302,11 @@ export async function loginWithGoogle(email: string, name?: string): Promise<{
   return { success: true, message: 'Berhasil terhubung dengan Google (offline)' };
 }
 
-export async function deleteAccount(id: string): Promise<boolean> {
+export async function deleteAccount(id: string): Promise<{
+  success: boolean;
+  users?: AppAccount[];
+  message?: string;
+}> {
   try {
     const res = await fetch(`/api/users/${encodeURIComponent(id)}`, {
       method: 'DELETE',
@@ -310,21 +314,29 @@ export async function deleteAccount(id: string): Promise<boolean> {
     if (res.ok) {
       const data = await res.json();
       if (data.success) {
-        // Update local storage cache only when server database confirms deletion
-        const localUsersStr = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
-        if (localUsersStr) {
-          try {
-            const parsed = JSON.parse(localUsersStr);
-            const updated = parsed.filter((u: AppAccount) => u.id !== id);
-            localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(updated));
-          } catch (e) {}
+        if (Array.isArray(data.users)) {
+          localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(data.users));
+          if (data.activeUserId) {
+            localStorage.setItem(ACTIVE_ACCOUNT_KEY, data.activeUserId);
+          }
+        } else {
+          const localUsersStr = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
+          if (localUsersStr) {
+            try {
+              const parsed = JSON.parse(localUsersStr);
+              const updated = parsed.filter(
+                (u: AppAccount) => u.id !== id && u.email.toLowerCase() !== id.toLowerCase()
+              );
+              localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(updated));
+            } catch (e) {}
+          }
         }
-        return true;
+        return { success: true, users: data.users, message: data.message };
       }
+      return { success: false, message: data.error || 'Gagal menghapus akun' };
     }
-    return false;
   } catch (err) {
     console.warn('Server delete user failed', err);
-    return false;
   }
+  return { success: false, message: 'Koneksi server terganggu' };
 }

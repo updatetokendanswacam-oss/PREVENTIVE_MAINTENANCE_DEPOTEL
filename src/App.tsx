@@ -156,7 +156,7 @@ export default function App() {
           }
 
           const { users } = await fetchAccounts();
-          if (users && users.length > 0) {
+          if (Array.isArray(users)) {
             setAccounts(users);
           }
         } catch (e) {
@@ -231,7 +231,7 @@ export default function App() {
   };
 
   const handleDeleteAccount = async (id: string) => {
-    const targetAcc = accounts.find((a) => a.id === id);
+    const targetAcc = accounts.find((a) => a.id === id || a.email.toLowerCase() === id.toLowerCase());
     if (!targetAcc) return;
 
     if (targetAcc.id === 'acc-admin-main' || targetAcc.email.toLowerCase() === 'updatetokendanswacam@gmail.com') {
@@ -240,15 +240,15 @@ export default function App() {
     }
 
     try {
-      const success = await deleteAccount(id);
-      if (success) {
-        const { users } = await fetchAccounts();
-        setAccounts(users);
+      const res = await deleteAccount(id);
+      if (res.success) {
+        const updatedUsers = res.users || (await fetchAccounts()).users;
+        setAccounts(updatedUsers);
         setActiveAccount((prev) => {
-          const adminMain = users.find((u) => u.id === 'acc-admin-main') || 
-                            users.find((u) => u.email === 'updatetokendanswacam@gmail.com');
+          const adminMain = updatedUsers.find((u) => u.id === 'acc-admin-main') || 
+                            updatedUsers.find((u) => u.email === 'updatetokendanswacam@gmail.com');
           if (prev && prev.id !== id && prev.id === 'acc-admin-main') return prev;
-          return adminMain || users[0] || null;
+          return adminMain || updatedUsers[0] || null;
         });
         setIsAdmin(true);
 
@@ -256,14 +256,14 @@ export default function App() {
         try {
           if (window.BroadcastChannel) {
             const bc = new BroadcastChannel('depotel_accounts_channel');
-            bc.postMessage({ type: 'ACCOUNTS_UPDATE', users });
+            bc.postMessage({ type: 'ACCOUNTS_UPDATE', users: updatedUsers });
             bc.close();
           }
         } catch (e) {}
 
         showToast(`Akun '${targetAcc.name}' berhasil dihapus permanen!`, 'success');
       } else {
-        showToast(`Gagal menghapus akun '${targetAcc.name}'.`, 'error');
+        showToast(res.message || `Gagal menghapus akun '${targetAcc.name}'.`, 'error');
       }
     } catch (err) {
       console.error('Delete account error:', err);
