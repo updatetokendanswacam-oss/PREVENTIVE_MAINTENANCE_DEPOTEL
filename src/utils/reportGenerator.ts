@@ -89,8 +89,13 @@ export function generateWhatsAppReport(data: DailyReportData): string {
       return timeA - timeB;
     });
 
-    // Display ALL site packages added to this team (both active and closed) so Preview shows all sites for each team
-    const packagesToDisplay = [...activePackages, ...sortedClosedPackages];
+    // Rule: When adding a second site list to a team, show the latest site package so the first one is replaced (like new again) in FORMAT PESAN WHATSAPP
+    let packagesToDisplay: typeof activePackages = [];
+    if (activePackages.length > 0) {
+      packagesToDisplay = [activePackages[activePackages.length - 1]];
+    } else if (sortedClosedPackages.length > 0) {
+      packagesToDisplay = [sortedClosedPackages[sortedClosedPackages.length - 1]];
+    }
 
     if (packagesToDisplay.length === 0) {
       lines.push('- Tidak ada site -');
