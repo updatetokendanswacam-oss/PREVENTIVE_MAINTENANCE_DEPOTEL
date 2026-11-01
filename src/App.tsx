@@ -210,33 +210,35 @@ export default function App() {
   }
 
   // Helper to ensure any operational update (sites, packages, genset, categories, etc.)
-  // updates the dashboard data while strictly preserving permanently saved custom WhatsApp reports
+  // updates the dashboard data and automatically regenerates and saves the WhatsApp report
   const applyDashboardUpdate = async (
     dataUpdater: (prev: DailyReportData) => DailyReportData,
     toastMsg?: { message: string; type?: 'success' | 'error' | 'info' },
     regenerateWhatsApp: boolean = true
   ) => {
     const updated = dataUpdater(reportData);
-    
-    // Check if user has explicitly edited and saved WhatsApp report permanently
     const lockKey = `depotel_custom_wa_is_edited_${reportData.id}`;
-    const isCustomLocked = 
-      reportData.isCustomWhatsAppEdited === true || 
-      localStorage.getItem(lockKey) === 'true';
-
-    const savedCustomReport = 
-      reportData.customWhatsAppReport || 
-      localStorage.getItem(`depotel_custom_wa_${reportData.id}`);
 
     let newWhatsAppText: string;
 
-    // If the user has permanently edited and saved the WhatsApp report, NEVER revert or overwrite it with auto-generator!
-    if (isCustomLocked && savedCustomReport && savedCustomReport.trim().length > 0) {
-      newWhatsAppText = savedCustomReport;
-    } else if (regenerateWhatsApp) {
+    if (regenerateWhatsApp) {
+      // User request:
+      // "perbaiki ketika ada penambahan site di list tim yang pertama untuk Preview Laporan WhatsApp akan berubah sesuai dengan yang di tambahkan,
+      //  ketika menambahkan list site yang ke dua yang pertama akan terganti seperti baru lagi, jangan bikin list site dobel sesuaikan dengan otomatis"
       newWhatsAppText = generateWhatsAppReport(updated);
+      try {
+        localStorage.removeItem(lockKey);
+        localStorage.removeItem('depotel_custom_wa_permanent_latest');
+      } catch (e) {
+        console.warn('Local storage clear lock error', e);
+      }
     } else {
-      newWhatsAppText = savedCustomReport || generateWhatsAppReport(updated);
+      const savedCustomReport = 
+        reportData.customWhatsAppReport || 
+        localStorage.getItem(`depotel_custom_wa_${reportData.id}`);
+      newWhatsAppText = (savedCustomReport && savedCustomReport.trim().length > 0)
+        ? savedCustomReport
+        : generateWhatsAppReport(updated);
     }
 
     try {
@@ -248,7 +250,7 @@ export default function App() {
     const cleanUpdated: DailyReportData = {
       ...updated,
       customWhatsAppReport: newWhatsAppText,
-      isCustomWhatsAppEdited: isCustomLocked,
+      isCustomWhatsAppEdited: regenerateWhatsApp ? false : reportData.isCustomWhatsAppEdited,
       updatedAt: new Date().toISOString(),
     };
 
