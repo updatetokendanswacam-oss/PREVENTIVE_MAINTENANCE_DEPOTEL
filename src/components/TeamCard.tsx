@@ -52,6 +52,16 @@ export const TeamCard: React.FC<TeamCardProps> = ({
   // Group team sites into unified packages (Site + Tower Space + EAS)
   const { activePackages, closedPackages } = groupSitesIntoPackages(team.sites);
 
+  // User request:
+  // "ketika admin meng klik Closed list site tim nya akan tetap sama pada Preview Laporan WhatsApp nya secara otomatis dan permanen, jangan merubah lagi jika setelah admin meng klik closed data list tim akan tetap sama pada Paket Site Aktif: dan FORMAT PESAN WHATSAPP"
+  // Keep the latest package visible in "Paket Site Aktif:" even after closed!
+  const displayedPackages =
+    activePackages.length > 0
+      ? activePackages
+      : closedPackages.length > 0
+      ? [closedPackages[closedPackages.length - 1]]
+      : [];
+
   return (
     <div className="bg-slate-900/95 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl hover:border-amber-500/30 transition-all flex flex-col justify-between group">
       
@@ -108,12 +118,12 @@ export const TeamCard: React.FC<TeamCardProps> = ({
           <div className="flex items-center justify-between text-xs text-slate-400 font-semibold mb-1">
             <span className="flex items-center gap-1.5">
               <span>Paket Site Aktif:</span>
-              <span className="text-amber-400 font-bold font-mono">({activePackages.length})</span>
+              <span className="text-amber-400 font-bold font-mono">({displayedPackages.length})</span>
             </span>
             {isAdmin && (
               <button
                 onClick={() => onAddSitePackage(team.id)}
-                className="text-amber-400 hover:text-amber-300 font-bold text-xs flex items-center gap-1 bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded-lg transition-colors"
+                className="text-amber-400 hover:text-amber-300 font-bold text-xs flex items-center gap-1 bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
               >
                 <Plus className="w-3 h-3" />
                 <span>Tambah Site</span>
@@ -121,19 +131,12 @@ export const TeamCard: React.FC<TeamCardProps> = ({
             )}
           </div>
 
-          {activePackages.length === 0 ? (
+          {displayedPackages.length === 0 ? (
             <div className="text-xs text-slate-400 italic py-4 text-center bg-slate-950/50 rounded-xl border border-slate-800/80 space-y-1.5">
-              {closedPackages.length > 0 ? (
-                <>
-                  <p className="text-emerald-400 font-bold">Semua paket site aktif sudah di-Closed ✅</p>
-                  <p className="text-slate-500 text-[11px]">Siap mulai baru. Klik "Tambah Site Baru" untuk input paket site berikutnya.</p>
-                </>
-              ) : (
-                <p>Belum ada paket site ditambahkan</p>
-              )}
+              <p>Belum ada paket site ditambahkan</p>
             </div>
           ) : (
-            activePackages.map((pkg, index) => (
+            displayedPackages.map((pkg, index) => (
               <div
                 key={pkg.packageId}
                 className="p-3 sm:p-3.5 rounded-xl bg-slate-950/80 border border-slate-800/90 hover:border-amber-500/40 transition-all space-y-2.5 shadow-md"
@@ -145,6 +148,12 @@ export const TeamCard: React.FC<TeamCardProps> = ({
                       <span className="text-[9px] font-mono font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/30">
                         PAKET #{index + 1}
                       </span>
+                      {pkg.isClosed && (
+                        <span className="text-[9px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/30 flex items-center gap-1">
+                          <CheckCircle2 className="w-2.5 h-2.5" />
+                          CLOSED ✅
+                        </span>
+                      )}
                       <span className="text-xs font-extrabold text-white font-mono break-all sm:break-normal truncate max-w-full">
                         {pkg.siteItem.text}
                       </span>
@@ -157,15 +166,22 @@ export const TeamCard: React.FC<TeamCardProps> = ({
                   </div>
 
                   <div className="flex items-center gap-1.5 flex-shrink-0">
-                    {/* SINGLE CLOSED BUTTON (CALCULATES SITE + TOWER SPACE TOGETHER) */}
-                    <button
-                      onClick={() => onClosedPackage(team.id, pkg)}
-                      className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-slate-950 border border-emerald-500/50 text-[11px] sm:text-xs font-black flex items-center gap-1 transition-all shadow-md active:scale-95 group/btn cursor-pointer"
-                      title="Klik Closed: Selesaikan Site, Tower Space & EAS sekaligus (PM SITE +1 & SPACE TOWER +1)"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 group-hover/btn:text-slate-950 transition-colors" />
-                      <span>CLOSED</span>
-                    </button>
+                    {/* SINGLE CLOSED BUTTON (OR CLOSED BADGE IF ALREADY CLOSED) */}
+                    {pkg.isClosed ? (
+                      <div className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 text-[11px] sm:text-xs font-black flex items-center gap-1 shadow-sm">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>CLOSED ✅</span>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => onClosedPackage(team.id, pkg)}
+                        className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-slate-950 border border-emerald-500/50 text-[11px] sm:text-xs font-black flex items-center gap-1 transition-all shadow-md active:scale-95 group/btn cursor-pointer"
+                        title="Klik Closed: Selesaikan Site, Tower Space & EAS sekaligus (PM SITE +1 & SPACE TOWER +1)"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 group-hover/btn:text-slate-950 transition-colors" />
+                        <span>CLOSED</span>
+                      </button>
+                    )}
 
                     {isAdmin && (
                       <>

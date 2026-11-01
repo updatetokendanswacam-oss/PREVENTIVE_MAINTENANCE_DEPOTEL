@@ -419,9 +419,8 @@ export default function App() {
         newSites.push(siteItem, towerItem, easItem);
       } else {
         // User request: "ketika menambahkan list site yang ke dua yang pertama akan terganti seperti baru lagi, jangan bikin list site dobel sesuaikan dengan otomatis"
-        // Retain closed sites, replace previous active site so active sites do NOT double up!
-        newSites = newSites.filter((s) => s.isClosed);
-        newSites.push(siteItem, towerItem, easItem);
+        // Replace previous site for this team completely so the second site replaces the first like brand new, never double!
+        newSites = [siteItem, towerItem, easItem];
       }
 
       return { ...t, sites: newSites };
