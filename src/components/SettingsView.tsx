@@ -663,15 +663,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   )}
 
                   {/* Delete Account Button & Inline Confirmation */}
-                  {isAdmin && (acc.id === 'acc-admin-main' || acc.email.toLowerCase() === 'updatetokendanswacam@gmail.com') ? (
+                  {acc.id === 'acc-admin-main' || acc.email.toLowerCase() === 'updatetokendanswacam@gmail.com' ? (
                     <span
-                      className="p-2 rounded-xl bg-slate-900/80 border border-amber-500/30 text-amber-400 flex items-center justify-center cursor-not-allowed"
+                      className="p-2 rounded-xl bg-slate-900/80 border border-amber-500/30 text-amber-400 flex items-center justify-center cursor-not-allowed shrink-0"
                       title="Akun ADMIN DEPOTEL UTAMA terlindungi dari penghapusan"
                     >
                       <ShieldCheck className="w-4 h-4 text-amber-400" />
                     </span>
-                  ) : isAdmin && deleteConfirmId === acc.id ? (
-                    <div className="flex items-center gap-1.5 bg-rose-950/90 border border-rose-500/70 rounded-xl px-2.5 py-1 shadow-lg animate-fadeIn">
+                  ) : deleteConfirmId === acc.id ? (
+                    <div className="flex items-center gap-1.5 bg-rose-950/90 border border-rose-500/70 rounded-xl px-2.5 py-1 shadow-lg animate-fadeIn shrink-0 z-10">
                       <span className="text-[11px] text-rose-200 font-bold whitespace-nowrap">Hapus akun?</span>
                       <button
                         type="button"
@@ -707,27 +707,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         Batal
                       </button>
                     </div>
-                  ) : isAdmin ? (
+                  ) : (
                     <button
                       type="button"
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        if (accounts.length > 1) {
-                          setDeleteConfirmId(acc.id);
-                        }
+                        setDeleteConfirmId(acc.id);
                       }}
-                      disabled={accounts.length <= 1}
-                      className={`p-2 rounded-xl transition-all border flex items-center justify-center cursor-pointer ${
-                        accounts.length <= 1
-                          ? 'opacity-30 cursor-not-allowed bg-slate-900 border-slate-800 text-slate-600'
-                          : 'bg-slate-900/90 hover:bg-rose-600 text-rose-400 hover:text-white border-slate-800 hover:border-rose-500/50 shadow-sm active:scale-95'
-                      }`}
-                      title={accounts.length <= 1 ? 'Minimal harus ada 1 akun di sistem' : `Hapus Akun ${acc.name}`}
+                      className="p-2 rounded-xl bg-slate-900/90 hover:bg-rose-600 text-rose-400 hover:text-white border border-slate-800 hover:border-rose-500/50 shadow-sm transition-all active:scale-95 cursor-pointer shrink-0 z-10"
+                      title={`Hapus Akun ${acc.name}`}
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-4 h-4 pointer-events-none" />
                     </button>
-                  ) : null}
+                  )}
 
                 </div>
               </div>

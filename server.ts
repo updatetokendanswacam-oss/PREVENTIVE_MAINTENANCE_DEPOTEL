@@ -75,7 +75,7 @@ function loadDatabase(): DatabaseStructure {
     if (fs.existsSync(DB_FILE)) {
       const content = fs.readFileSync(DB_FILE, 'utf-8');
       const parsed = JSON.parse(content);
-      const users = Array.isArray(parsed.users) && parsed.users.length > 0
+      const users = Array.isArray(parsed.users)
         ? parsed.users
         : DEFAULT_ACCOUNTS;
       const activeUserId = parsed.activeUserId || users[0].id;
