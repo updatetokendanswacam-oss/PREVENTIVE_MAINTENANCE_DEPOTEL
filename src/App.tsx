@@ -418,9 +418,11 @@ export default function App() {
         newSites = newSites.filter((s) => !oldIds.has(s.id) && s.packageId !== pkgId);
         newSites.push(siteItem, towerItem, easItem);
       } else {
-        // User request: "ketika menambahkan list site yang ke dua yang pertama akan terganti seperti baru lagi, jangan bikin list site dobel sesuaikan dengan otomatis"
-        // Replace previous site for this team completely so the second site replaces the first like brand new, never double!
-        newSites = [siteItem, towerItem, easItem];
+        // User request:
+        // "1. perbaiki ketika ada penambahan site di list tim yang pertama untuk Preview Laporan WhatsApp akan berubah sesuai dengan yang di tambahkan, ketika menambahkan list site yang ke dua yang pertama akan terganti seperti baru lagi, jangan bikin list site dobel sesuaikan dengan otomatis"
+        // Retain closed sites in "Paket Site Closed Hari Ini", replace previous active site so active sites do NOT double up!
+        newSites = newSites.filter((s) => s.isClosed);
+        newSites.push(siteItem, towerItem, easItem);
       }
 
       return { ...t, sites: newSites };

@@ -30,7 +30,7 @@ export const TeamCard: React.FC<TeamCardProps> = ({
   onDeleteClosedPackage,
   onUpdateNote,
 }) => {
-  const [showClosedSection, setShowClosedSection] = useState(false);
+  const [showClosedSection, setShowClosedSection] = useState(true);
   const [editingNotePkgId, setEditingNotePkgId] = useState<string | null>(null);
   const [noteInputValue, setNoteInputValue] = useState('');
 
@@ -51,16 +51,6 @@ export const TeamCard: React.FC<TeamCardProps> = ({
 
   // Group team sites into unified packages (Site + Tower Space + EAS)
   const { activePackages, closedPackages } = groupSitesIntoPackages(team.sites);
-
-  // User request:
-  // "ketika admin meng klik Closed list site tim nya akan tetap sama pada Preview Laporan WhatsApp nya secara otomatis dan permanen, jangan merubah lagi jika setelah admin meng klik closed data list tim akan tetap sama pada Paket Site Aktif: dan FORMAT PESAN WHATSAPP"
-  // Keep the latest package visible in "Paket Site Aktif:" even after closed!
-  const displayedPackages =
-    activePackages.length > 0
-      ? activePackages
-      : closedPackages.length > 0
-      ? [closedPackages[closedPackages.length - 1]]
-      : [];
 
   return (
     <div className="bg-slate-900/95 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl hover:border-amber-500/30 transition-all flex flex-col justify-between group">
@@ -118,7 +108,7 @@ export const TeamCard: React.FC<TeamCardProps> = ({
           <div className="flex items-center justify-between text-xs text-slate-400 font-semibold mb-1">
             <span className="flex items-center gap-1.5">
               <span>Paket Site Aktif:</span>
-              <span className="text-amber-400 font-bold font-mono">({displayedPackages.length})</span>
+              <span className="text-amber-400 font-bold font-mono">({activePackages.length})</span>
             </span>
             {isAdmin && (
               <button
@@ -131,12 +121,19 @@ export const TeamCard: React.FC<TeamCardProps> = ({
             )}
           </div>
 
-          {displayedPackages.length === 0 ? (
+          {activePackages.length === 0 ? (
             <div className="text-xs text-slate-400 italic py-4 text-center bg-slate-950/50 rounded-xl border border-slate-800/80 space-y-1.5">
-              <p>Belum ada paket site ditambahkan</p>
+              {closedPackages.length > 0 ? (
+                <>
+                  <p className="text-emerald-400 font-bold">Semua paket site aktif sudah di-Closed ✅</p>
+                  <p className="text-slate-500 text-[11px]">Tersimpan di Paket Site Closed Hari Ini. Klik "+ Tambah Site" untuk input site berikutnya.</p>
+                </>
+              ) : (
+                <p>Belum ada paket site ditambahkan</p>
+              )}
             </div>
           ) : (
-            displayedPackages.map((pkg, index) => (
+            activePackages.map((pkg, index) => (
               <div
                 key={pkg.packageId}
                 className="p-3 sm:p-3.5 rounded-xl bg-slate-950/80 border border-slate-800/90 hover:border-amber-500/40 transition-all space-y-2.5 shadow-md"
