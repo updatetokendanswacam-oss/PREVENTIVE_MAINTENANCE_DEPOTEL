@@ -252,18 +252,28 @@ export async function saveAccount(account: Partial<AppAccount>): Promise<{
   return { success: true, message: 'Akun disimpan secara lokal' };
 }
 
-export async function toggleAccountStatus(id: string): Promise<boolean> {
+export async function toggleAccountStatus(id: string): Promise<{
+  success: boolean;
+  users?: AppAccount[];
+  message?: string;
+}> {
   try {
     const res = await fetch('/api/users/toggle-status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),
     });
-    if (res.ok) return true;
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.users)) {
+        localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(data.users));
+        return { success: true, users: data.users, message: data.message };
+      }
+    }
   } catch (err) {
     console.warn('Server toggle user failed', err);
   }
-  return true;
+  return { success: false, message: 'Gagal merubah status akun' };
 }
 
 export async function switchActiveAccount(id: string): Promise<boolean> {
@@ -274,7 +284,13 @@ export async function switchActiveAccount(id: string): Promise<boolean> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),
     });
-    if (res.ok) return true;
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.users)) {
+        localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(data.users));
+      }
+      return true;
+    }
   } catch (err) {
     console.warn('Server switch user failed', err);
   }

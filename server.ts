@@ -238,7 +238,7 @@ async function startServer() {
 
     const db = loadDatabase();
     const cleanEmail = String(email).trim().toLowerCase();
-    const existingIdx = id ? db.users.findIndex((u) => u.id === id) : db.users.findIndex((u) => u.email.toLowerCase() === cleanEmail);
+    const existingIdx = id ? db.users.findIndex((u) => u.id === id || u.email.toLowerCase() === cleanEmail) : db.users.findIndex((u) => u.email.toLowerCase() === cleanEmail);
 
     if (existingIdx >= 0) {
       // Update existing
@@ -253,7 +253,7 @@ async function startServer() {
         lastLoginAt: new Date().toISOString(),
       };
       saveDatabase(db);
-      res.json({ success: true, message: 'Akun berhasil diperbarui', account: db.users[existingIdx] });
+      res.json({ success: true, message: 'Akun berhasil diperbarui', account: db.users[existingIdx], users: db.users });
     } else {
       // Create new account with immediate connection
       const newAcc: AppAccountServer = {
@@ -270,7 +270,7 @@ async function startServer() {
       db.users.push(newAcc);
       // DO NOT switch active user when adding account; retain current ADMIN DEPOTEL UTAMA session
       saveDatabase(db);
-      res.json({ success: true, message: 'Akun baru berhasil ditambahkan', account: newAcc });
+      res.json({ success: true, message: 'Akun baru berhasil ditambahkan', account: newAcc, users: db.users });
     }
   });
 
@@ -278,29 +278,31 @@ async function startServer() {
   apiRouter.post('/users/toggle-status', (req: Request, res: Response) => {
     const { id } = req.body;
     const db = loadDatabase();
-    const user = db.users.find((u) => u.id === id);
+    const cleanId = String(id).trim().toLowerCase();
+    const user = db.users.find((u) => u.id === id || u.id.toLowerCase() === cleanId || u.email.toLowerCase() === cleanId);
     if (!user) {
-      res.status(404).json({ success: false, error: 'Akun tidak ditemukan' });
+      res.status(404).json({ success: false, error: 'Akun tidak ditemukan di database' });
       return;
     }
     user.status = user.status === 'AKTIF' ? 'NONAKTIF' : 'AKTIF';
     saveDatabase(db);
-    res.json({ success: true, message: `Status akun diubah menjadi ${user.status}`, account: user });
+    res.json({ success: true, message: `Status akun ${user.name} diubah menjadi ${user.status}`, account: user, users: db.users });
   });
 
   // POST /api/users/switch
   apiRouter.post('/users/switch', (req: Request, res: Response) => {
     const { id } = req.body;
     const db = loadDatabase();
-    const user = db.users.find((u) => u.id === id);
+    const cleanId = String(id).trim().toLowerCase();
+    const user = db.users.find((u) => u.id === id || u.id.toLowerCase() === cleanId || u.email.toLowerCase() === cleanId);
     if (!user) {
       res.status(404).json({ success: false, error: 'Akun tidak ditemukan' });
       return;
     }
     user.lastLoginAt = new Date().toISOString();
-    db.activeUserId = id;
+    db.activeUserId = user.id;
     saveDatabase(db);
-    res.json({ success: true, message: `Berhasil masuk sebagai ${user.name}`, activeUser: user });
+    res.json({ success: true, message: `Berhasil masuk sebagai ${user.name}`, activeUser: user, users: db.users, activeUserId: db.activeUserId });
   });
 
   // POST /api/users/google-login
@@ -337,7 +339,7 @@ async function startServer() {
 
     db.activeUserId = user.id;
     saveDatabase(db);
-    res.json({ success: true, message: `Berhasil terhubung dengan Google (${user.email})`, activeUser: user });
+    res.json({ success: true, message: `Berhasil terhubung dengan Google (${user.email})`, activeUser: user, users: db.users, activeUserId: db.activeUserId });
   });
 
   // DELETE /api/users/:id

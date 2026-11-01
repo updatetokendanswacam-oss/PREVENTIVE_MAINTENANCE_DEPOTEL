@@ -217,17 +217,29 @@ export default function App() {
   };
 
   const handleToggleStatus = async (id: string) => {
-    await toggleAccountStatus(id);
-    const { users } = await fetchAccounts();
-    setAccounts(users);
-    if (activeAccount?.id === id) {
-      const updated = users.find((u) => u.id === id);
-      if (updated) {
-        setActiveAccount(updated);
-        setIsAdmin(updated.role === 'ROLE_ADMIN' && updated.status === 'AKTIF');
+    const res = await toggleAccountStatus(id);
+    if (res.success && res.users) {
+      setAccounts(res.users);
+      if (activeAccount?.id === id) {
+        const updated = res.users.find((u) => u.id === id || u.email.toLowerCase() === id.toLowerCase());
+        if (updated) {
+          setActiveAccount(updated);
+          setIsAdmin(updated.role === 'ROLE_ADMIN' && updated.status === 'AKTIF');
+        }
       }
+      showToast(res.message || 'Status akun berhasil diubah', 'success');
+
+      // Broadcast account status update in real-time across open tabs/windows
+      try {
+        if (window.BroadcastChannel) {
+          const bc = new BroadcastChannel('depotel_accounts_channel');
+          bc.postMessage({ type: 'ACCOUNTS_UPDATE', users: res.users });
+          bc.close();
+        }
+      } catch (e) {}
+    } else {
+      showToast(res.message || 'Gagal mengubah status akun', 'error');
     }
-    showToast('Status akun berhasil diubah', 'success');
   };
 
   const handleDeleteAccount = async (id: string) => {
