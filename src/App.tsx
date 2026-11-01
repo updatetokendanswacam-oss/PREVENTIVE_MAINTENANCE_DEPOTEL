@@ -397,7 +397,8 @@ export default function App() {
 
     await applyDashboardUpdate(
       (prev) => ({ ...prev, teams: newTeams }),
-      { message: teamInfo.id ? 'Data team berhasil diperbarui' : 'Team baru berhasil ditambahkan' }
+      { message: teamInfo.id ? 'Data team berhasil diperbarui' : 'Team baru berhasil ditambahkan' },
+      true
     );
   };
 
@@ -407,7 +408,8 @@ export default function App() {
       const newTeams = reportData.teams.filter((t) => t.id !== teamId);
       await applyDashboardUpdate(
         (prev) => ({ ...prev, teams: newTeams }),
-        { message: 'Team berhasil dihapus' }
+        { message: 'Team berhasil dihapus' },
+        true
       );
     }
   };
@@ -768,7 +770,8 @@ export default function App() {
     ];
     await applyDashboardUpdate(
       (prev) => ({ ...prev, gensetFixSites: newSites }),
-      { message: 'Site Genset Fix berhasil ditambahkan' }
+      { message: 'Site Genset Fix berhasil ditambahkan' },
+      true
     );
   };
 
@@ -778,7 +781,8 @@ export default function App() {
     );
     await applyDashboardUpdate(
       (prev) => ({ ...prev, gensetFixSites: newSites }),
-      { message: 'Site Genset Fix berhasil diperbarui' }
+      { message: 'Site Genset Fix berhasil diperbarui' },
+      true
     );
   };
 
@@ -786,7 +790,8 @@ export default function App() {
     const newSites = reportData.gensetFixSites.filter((g) => g.id !== siteId);
     await applyDashboardUpdate(
       (prev) => ({ ...prev, gensetFixSites: newSites }),
-      { message: 'Site Genset Fix berhasil dihapus' }
+      { message: 'Site Genset Fix berhasil dihapus' },
+      true
     );
   };
 
@@ -794,7 +799,8 @@ export default function App() {
   const handleSaveNote = async (newNote: string) => {
     await applyDashboardUpdate(
       (prev) => ({ ...prev, note: newNote }),
-      { message: 'Catatan laporan berhasil diperbarui' }
+      { message: 'Catatan laporan berhasil diperbarui' },
+      true
     );
   };
 

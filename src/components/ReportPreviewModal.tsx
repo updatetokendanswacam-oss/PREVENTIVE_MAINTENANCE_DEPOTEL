@@ -78,8 +78,9 @@ export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({
   const [copied, setCopied] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
-  // Sync state when modal opens or report ID changes.
-  // CRITICAL: Saved custom edits are locked and will NEVER be overwritten or revert back!
+  // Sync state when modal opens or report ID/teams change.
+  // CRITICAL: Live generated report updates dynamically with list site edits/adds/deletions.
+  // Saved custom edits are locked only if user explicitly saved a manual custom edit in this modal.
   useEffect(() => {
     if (!isOpen) return;
 
@@ -87,26 +88,27 @@ export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({
       reportData.isCustomWhatsAppEdited === true ||
       localStorage.getItem(lockKey) === 'true';
 
-    const saved = reportData.customWhatsAppReport || localStorage.getItem(storageKey);
-
-    if (saved && saved.trim().length > 0) {
-      setCurrentText(saved);
-      setDraftText(saved);
-      setHasCustomSaved(true);
-    } else if (isUserEdited) {
+    if (isUserEdited) {
+      const saved = reportData.customWhatsAppReport || localStorage.getItem(storageKey);
       const globalLatest = localStorage.getItem('depotel_custom_wa_permanent_latest');
-      const textToUse = globalLatest && globalLatest.trim().length > 0 ? globalLatest : liveGeneratedText;
+      const textToUse =
+        saved && saved.trim().length > 0
+          ? saved
+          : globalLatest && globalLatest.trim().length > 0
+          ? globalLatest
+          : liveGeneratedText;
       setCurrentText(textToUse);
       setDraftText(textToUse);
       setHasCustomSaved(true);
     } else {
+      // Live sync matching the exact current site list in Paket Site Aktif / WebApp!
       const initialText = liveGeneratedText;
       setCurrentText(initialText);
       setDraftText(initialText);
       setHasCustomSaved(false);
     }
     setIsEditing(false);
-  }, [isOpen, reportData.id, reportData.customWhatsAppReport, reportData.isCustomWhatsAppEdited]);
+  }, [isOpen, reportData.id, reportData.customWhatsAppReport, reportData.isCustomWhatsAppEdited, liveGeneratedText]);
 
   const handleStartEdit = () => {
     setDraftText(currentText);
