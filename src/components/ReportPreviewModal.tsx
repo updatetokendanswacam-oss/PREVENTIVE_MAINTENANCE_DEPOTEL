@@ -222,24 +222,21 @@ export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({
                 <h3 className="text-base sm:text-lg font-bold text-white truncate">
                   Preview Laporan WhatsApp
                 </h3>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5 shadow-sm">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>LIVE REALTIME SYNC</span>
+                </span>
                 {isLockedAsCustom ? (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 shadow-sm">
-                    <Sparkles className="w-3 h-3 text-emerald-400" />
-                    Format Editan Permanen
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1 shadow-sm">
                     <Sparkles className="w-3 h-3 text-amber-400" />
-                    Auto-Sync WebApp
+                    Proteksi Closed (Teks Terjaga)
                   </span>
-                )}
+                ) : null}
               </div>
               <p className="text-xs text-slate-400 truncate mt-0.5">
                 {isEditing
                   ? 'Mode Edit: Ubah isi laporan langsung & simpan permanen'
-                  : isLockedAsCustom
-                  ? 'Tersimpan permanen & tidak balik lagi ke semula saat data WebApp diperbarui'
-                  : 'Tersimpan otomatis sesuai data operasional WebApp'}
+                  : 'Tersinkronisasi Realtime dengan List Site Tim (Teks terjaga saat di-closed)'}
               </p>
             </div>
           </div>

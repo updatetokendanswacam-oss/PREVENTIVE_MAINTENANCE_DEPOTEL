@@ -927,14 +927,20 @@ export default function App() {
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
                 <div>
-                  <h2 className="text-base sm:text-lg font-extrabold text-white uppercase tracking-tight flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
-                    BAGIAN D. PM SITE - DAFTAR TEAM ({reportData.teams.length})
-              </h2>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Kelola status site untuk masing-masing team operasional
-              </p>
-            </div>
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <h2 className="text-base sm:text-lg font-extrabold text-white uppercase tracking-tight flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                      BAGIAN D. PM SITE - DAFTAR TEAM ({reportData.teams.length})
+                    </h2>
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5 shadow-sm">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>LIVE REALTIME SYNC</span>
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Kelola status site untuk masing-masing team operasional (Tersinkronisasi Realtime dengan Preview WhatsApp)
+                  </p>
+                </div>
 
             {isAdmin && (
               <button
