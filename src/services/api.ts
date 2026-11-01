@@ -307,9 +307,24 @@ export async function deleteAccount(id: string): Promise<boolean> {
     const res = await fetch(`/api/users/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     });
-    if (res.ok) return true;
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) {
+        // Update local storage cache only when server database confirms deletion
+        const localUsersStr = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
+        if (localUsersStr) {
+          try {
+            const parsed = JSON.parse(localUsersStr);
+            const updated = parsed.filter((u: AppAccount) => u.id !== id);
+            localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(updated));
+          } catch (e) {}
+        }
+        return true;
+      }
+    }
+    return false;
   } catch (err) {
     console.warn('Server delete user failed', err);
+    return false;
   }
-  return true;
 }

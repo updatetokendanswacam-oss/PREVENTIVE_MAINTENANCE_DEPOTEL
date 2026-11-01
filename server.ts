@@ -342,16 +342,30 @@ async function startServer() {
   apiRouter.delete('/users/:id', (req: Request, res: Response) => {
     const { id } = req.params;
     const db = loadDatabase();
-    if (db.users.length <= 1) {
-      res.status(400).json({ success: false, error: 'Tidak dapat menghapus akun terakhir' });
+
+    const targetUser = db.users.find((u) => u.id === id);
+    if (!targetUser) {
+      res.status(404).json({ success: false, error: 'Akun tidak ditemukan di database' });
       return;
     }
+
+    if (targetUser.id === 'acc-admin-main' || targetUser.email.toLowerCase() === 'updatetokendanswacam@gmail.com') {
+      res.status(403).json({ success: false, error: 'Akun ADMIN DEPOTEL UTAMA terlindungi dan tidak dapat dihapus' });
+      return;
+    }
+
+    if (db.users.length <= 1) {
+      res.status(400).json({ success: false, error: 'Tidak dapat menghapus akun terakhir di sistem' });
+      return;
+    }
+
     db.users = db.users.filter((u) => u.id !== id);
     if (db.activeUserId === id) {
-      db.activeUserId = db.users[0].id;
+      const adminMain = db.users.find((u) => u.id === 'acc-admin-main') || db.users[0];
+      db.activeUserId = adminMain.id;
     }
     saveDatabase(db);
-    res.json({ success: true, message: 'Akun berhasil dihapus' });
+    res.json({ success: true, message: `Akun ${targetUser.name} berhasil dihapus permanen` });
   });
 
   // GET /api/sites (Read attached Telkomsel Site CSV or fallback to remote)

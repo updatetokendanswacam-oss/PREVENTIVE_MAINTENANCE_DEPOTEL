@@ -663,7 +663,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   )}
 
                   {/* Delete Account Button & Inline Confirmation */}
-                  {deleteConfirmId === acc.id ? (
+                  {isAdmin && (acc.id === 'acc-admin-main' || acc.email.toLowerCase() === 'updatetokendanswacam@gmail.com') ? (
+                    <span
+                      className="p-2 rounded-xl bg-slate-900/80 border border-amber-500/30 text-amber-400 flex items-center justify-center cursor-not-allowed"
+                      title="Akun ADMIN DEPOTEL UTAMA terlindungi dari penghapusan"
+                    >
+                      <ShieldCheck className="w-4 h-4 text-amber-400" />
+                    </span>
+                  ) : isAdmin && deleteConfirmId === acc.id ? (
                     <div className="flex items-center gap-1.5 bg-rose-950/90 border border-rose-500/70 rounded-xl px-2.5 py-1 shadow-lg animate-fadeIn">
                       <span className="text-[11px] text-rose-200 font-bold whitespace-nowrap">Hapus akun?</span>
                       <button
@@ -700,7 +707,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         Batal
                       </button>
                     </div>
-                  ) : (
+                  ) : isAdmin ? (
                     <button
                       type="button"
                       onClick={(e) => {
@@ -720,7 +727,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
-                  )}
+                  ) : null}
 
                 </div>
               </div>

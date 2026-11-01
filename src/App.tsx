@@ -121,6 +121,8 @@ export default function App() {
 
   useEffect(() => {
     let bc: BroadcastChannel | null = null;
+    let accountsBc: BroadcastChannel | null = null;
+
     try {
       if (window.BroadcastChannel) {
         bc = new BroadcastChannel('depotel_realtime_channel');
@@ -129,6 +131,13 @@ export default function App() {
             if (event.data.data.updatedAt !== reportDataRef.current?.updatedAt) {
               setReportData(event.data.data);
             }
+          }
+        };
+
+        accountsBc = new BroadcastChannel('depotel_accounts_channel');
+        accountsBc.onmessage = (event) => {
+          if (event.data && event.data.type === 'ACCOUNTS_UPDATE' && Array.isArray(event.data.users)) {
+            setAccounts(event.data.users);
           }
         };
       }
@@ -145,6 +154,11 @@ export default function App() {
           ) {
             setReportData(data);
           }
+
+          const { users } = await fetchAccounts();
+          if (users && users.length > 0) {
+            setAccounts(users);
+          }
         } catch (e) {
           // ignore transient poll error
         }
@@ -153,6 +167,7 @@ export default function App() {
 
     return () => {
       if (bc) bc.close();
+      if (accountsBc) accountsBc.close();
       clearInterval(syncInterval);
     };
   }, []);
@@ -216,21 +231,43 @@ export default function App() {
   };
 
   const handleDeleteAccount = async (id: string) => {
+    const targetAcc = accounts.find((a) => a.id === id);
+    if (!targetAcc) return;
+
+    if (targetAcc.id === 'acc-admin-main' || targetAcc.email.toLowerCase() === 'updatetokendanswacam@gmail.com') {
+      showToast('Akun ADMIN DEPOTEL UTAMA terlindungi dan tidak dapat dihapus', 'error');
+      return;
+    }
+
     try {
-      await deleteAccount(id);
-      const { users } = await fetchAccounts();
-      setAccounts(users);
-      setActiveAccount((prev) => {
-        const adminMain = users.find((u) => u.id === 'acc-admin-main') || 
-                          users.find((u) => u.email === 'updatetokendanswacam@gmail.com');
-        if (prev && prev.id !== id && prev.id === 'acc-admin-main') return prev;
-        return adminMain || users[0] || null;
-      });
-      setIsAdmin(true);
-      showToast('Akun berhasil dihapus dari sistem', 'info');
+      const success = await deleteAccount(id);
+      if (success) {
+        const { users } = await fetchAccounts();
+        setAccounts(users);
+        setActiveAccount((prev) => {
+          const adminMain = users.find((u) => u.id === 'acc-admin-main') || 
+                            users.find((u) => u.email === 'updatetokendanswacam@gmail.com');
+          if (prev && prev.id !== id && prev.id === 'acc-admin-main') return prev;
+          return adminMain || users[0] || null;
+        });
+        setIsAdmin(true);
+
+        // Broadcast account deletion in real-time across open tabs/windows
+        try {
+          if (window.BroadcastChannel) {
+            const bc = new BroadcastChannel('depotel_accounts_channel');
+            bc.postMessage({ type: 'ACCOUNTS_UPDATE', users });
+            bc.close();
+          }
+        } catch (e) {}
+
+        showToast(`Akun '${targetAcc.name}' berhasil dihapus permanen!`, 'success');
+      } else {
+        showToast(`Gagal menghapus akun '${targetAcc.name}'.`, 'error');
+      }
     } catch (err) {
       console.error('Delete account error:', err);
-      showToast('Gagal menghapus akun', 'error');
+      showToast('Terjadi kesalahan saat menghapus akun', 'error');
     }
   };
 
