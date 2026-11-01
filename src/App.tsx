@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Header } from './components/Header';
 import { SummaryCards } from './components/SummaryCards';
 import { CategoryEditModal } from './components/CategoryEditModal';
@@ -111,6 +111,33 @@ export default function App() {
       }
     }
     initData();
+  }, []);
+
+  // Realtime Sync Polling: Syncs operational changes across all open tabs and devices automatically
+  const reportDataRef = useRef(reportData);
+  useEffect(() => {
+    reportDataRef.current = reportData;
+  }, [reportData]);
+
+  useEffect(() => {
+    const syncInterval = setInterval(async () => {
+      if (document.visibilityState === 'visible') {
+        try {
+          const { data } = await fetchDashboardData();
+          if (
+            data &&
+            data.updatedAt &&
+            data.updatedAt !== reportDataRef.current?.updatedAt
+          ) {
+            setReportData(data);
+          }
+        } catch (e) {
+          // ignore transient poll error
+        }
+      }
+    }, 6000);
+
+    return () => clearInterval(syncInterval);
   }, []);
 
   // Save changes to API & storage asynchronously without blocking UI
@@ -583,19 +610,68 @@ export default function App() {
       };
     });
 
-    await applyDashboardUpdate(
+    applyDashboardUpdate(
       (prev) => ({
         ...prev,
         categories: updatedCategories,
         teams: newTeams,
       }),
       { message: `Paket '${pkgName}' Closed! Data Laporan Utama (PM Site & Tower Space) bertambah +1` },
-      true
+      false // REQUIREMENT #5: DO NOT auto-regenerate or alter Preview Laporan WhatsApp on closed!
+    );
+  };
+
+  // Handler to REOPEN a closed package from Paket Site Closed Hari Ini back to Paket Site Aktif
+  const handleReopenPackage = (teamId: string, packageId: string) => {
+    // 1. Decrement achievement for PM SITE NOP SOUTHERN and SPACE TOWER
+    const updatedCategories = reportData.categories.map((cat) => {
+      if (cat.id === 'nop_southern' || cat.id === 'space_tower') {
+        const newAchievement = Math.max(0, cat.achievement - 1);
+        const newRemaining = Math.max(0, cat.target - newAchievement);
+        const newPercentage =
+          cat.target > 0 ? Math.round((newAchievement / cat.target) * 100) : 100;
+        return {
+          ...cat,
+          achievement: newAchievement,
+          remaining: newRemaining,
+          percentage: newPercentage,
+        };
+      }
+      return cat;
+    });
+
+    // 2. Mark package items as isClosed: false and status: 'PROGRESS'
+    const newTeams = reportData.teams.map((t) => {
+      if (t.id !== teamId) return t;
+
+      const newSites = t.sites.map((s) => {
+        if (s.packageId === packageId) {
+          return {
+            ...s,
+            isClosed: false,
+            closedAt: undefined,
+            status: s.packageRole === 'site' ? ('PROGRESS' as SiteStatus) : s.status,
+          };
+        }
+        return s;
+      });
+
+      return { ...t, sites: newSites };
+    });
+
+    applyDashboardUpdate(
+      (prev) => ({
+        ...prev,
+        categories: updatedCategories,
+        teams: newTeams,
+      }),
+      { message: 'Paket site berhasil dibuka kembali (Reopened) ke Paket Site Aktif!' },
+      false // REQUIREMENT #5: DO NOT touch Preview Laporan WhatsApp on reopen
     );
   };
 
   // Handler to delete a closed package from the closed list (updates Data Laporan Utama)
-  const handleDeleteClosedPackage = async (teamId: string, packageId: string) => {
+  const handleDeleteClosedPackage = (teamId: string, packageId: string) => {
     // 1. Decrement achievement for PM SITE NOP SOUTHERN and SPACE TOWER
     const updatedCategories = reportData.categories.map((cat) => {
       if (cat.id === 'nop_southern' || cat.id === 'space_tower') {
@@ -633,14 +709,14 @@ export default function App() {
       };
     });
 
-    await applyDashboardUpdate(
+    applyDashboardUpdate(
       (prev) => ({
         ...prev,
         categories: updatedCategories,
         teams: newTeams,
       }),
       { message: 'Paket Site Closed berhasil dihapus' },
-      true
+      false // REQUIREMENT #5: DO NOT touch Preview Laporan WhatsApp
     );
   };
 
@@ -855,6 +931,7 @@ export default function App() {
                 onStatusChange={handleStatusChange}
                 onClosedPackage={handleClosedPackage}
                 onDeleteClosedPackage={handleDeleteClosedPackage}
+                onReopenPackage={handleReopenPackage}
                 onUpdateNote={handleUpdatePackageNote}
               />
             ))}

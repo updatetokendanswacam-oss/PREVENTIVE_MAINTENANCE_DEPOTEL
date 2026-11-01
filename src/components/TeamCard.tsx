@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Phone, Plus, Trash2, CheckCircle2, Archive, ChevronDown, ChevronUp, Radio } from 'lucide-react';
+import { Phone, Plus, Trash2, CheckCircle2, Archive, ChevronDown, ChevronUp, Radio, RotateCcw } from 'lucide-react';
 import { TeamData, SiteStatus, SitePackage } from '../types/reporting';
 import { groupSitesIntoPackages } from '../utils/packageUtils';
 
@@ -14,6 +14,7 @@ interface TeamCardProps {
   onStatusChange: (teamId: string, siteId: string, newStatus: SiteStatus) => void;
   onClosedPackage: (teamId: string, pkg: SitePackage) => void;
   onDeleteClosedPackage: (teamId: string, packageId: string) => void;
+  onReopenPackage?: (teamId: string, packageId: string) => void;
   onUpdateNote?: (teamId: string, packageId: string, noteText: string) => void;
 }
 
@@ -28,6 +29,7 @@ export const TeamCard = React.memo<TeamCardProps>(({
   onStatusChange,
   onClosedPackage,
   onDeleteClosedPackage,
+  onReopenPackage,
   onUpdateNote,
 }) => {
   const [showClosedSection, setShowClosedSection] = useState(true);
@@ -375,46 +377,128 @@ export const TeamCard = React.memo<TeamCardProps>(({
         {closedPackages.length > 0 && (
           <div className="mt-3 pt-2.5 border-t border-slate-800/80">
             <button
+              type="button"
               onClick={() => setShowClosedSection(!showClosedSection)}
-              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-slate-950/60 hover:bg-slate-950 border border-slate-800 text-[11px] font-bold text-slate-300 transition-colors"
+              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-slate-950/60 hover:bg-slate-950 border border-slate-800 text-[11px] font-bold text-slate-300 transition-colors cursor-pointer"
             >
               <span className="flex items-center gap-1.5 text-emerald-400">
                 <Archive className="w-3.5 h-3.5" />
                 <span>Paket Site Closed Hari Ini ({closedPackages.length})</span>
               </span>
               <span className="text-[10px] text-slate-500 flex items-center gap-1">
-                <span>{showClosedSection ? 'Tutup' : 'Lihat'}</span>
+                <span>{showClosedSection ? 'Sembunyikan' : 'Tampilkan'}</span>
                 {showClosedSection ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
               </span>
             </button>
 
             {showClosedSection && (
-              <div className="mt-2 space-y-2 pl-1">
-                {closedPackages.map((cPkg, cIdx) => (
-                  <div
-                    key={cPkg.packageId}
-                    className="p-2.5 rounded-lg bg-emerald-950/20 border border-emerald-500/20 text-xs flex items-center justify-between gap-2"
-                  >
-                    <div className="overflow-hidden pr-2">
-                      <div className="font-mono text-slate-200 line-through text-[11px] flex items-center gap-1">
-                        <span className="text-slate-500">#{cIdx + 1}.</span>
-                        <span className="font-bold">{cPkg.siteItem.text}</span>
-                      </div>
-                      <span className="text-[10px] text-emerald-400 font-mono block mt-0.5">
-                        ✓ PM Site & Space Tower Closed
-                      </span>
-                    </div>
+              <div className="mt-2 space-y-2.5 pl-0.5">
+                {[...closedPackages]
+                  .sort((a, b) => {
+                    const timeA = a.closedAt ? new Date(a.closedAt).getTime() : 0;
+                    const timeB = b.closedAt ? new Date(b.closedAt).getTime() : 0;
+                    return timeB - timeA;
+                  })
+                  .map((cPkg) => {
+                    const closedDateObj = cPkg.closedAt ? new Date(cPkg.closedAt) : new Date();
+                    const formattedDate = closedDateObj.toLocaleDateString('id-ID', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                    });
+                    const formattedTime = closedDateObj.toLocaleTimeString('id-ID', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit',
+                    });
 
-                    <button
-                      onClick={() => onDeleteClosedPackage(team.id, cPkg.packageId)}
-                      className="flex-shrink-0 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-600 border border-rose-500/30 text-rose-300 hover:text-white transition-all flex items-center gap-1 cursor-pointer shadow-sm"
-                      title="Hapus Paket Site Closed ini"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Hapus</span>
-                    </button>
-                  </div>
-                ))}
+                    const siteName = cPkg.siteItem?.siteName || cPkg.siteItem?.text || 'Site';
+                    const siteId = cPkg.siteItem?.siteId || '-';
+                    const noteText = cPkg.siteItem?.note || cPkg.note || '-';
+
+                    return (
+                      <div
+                        key={cPkg.packageId}
+                        className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30 text-xs space-y-2 shadow-sm"
+                      >
+                        {/* Header info */}
+                        <div className="flex items-start justify-between gap-2 border-b border-emerald-500/20 pb-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[10px] font-mono font-black text-emerald-400 bg-emerald-500/20 px-1.5 py-0.5 rounded border border-emerald-500/40">
+                                CLOSED ✅
+                              </span>
+                              <span className="font-extrabold text-white font-mono truncate text-xs">
+                                {siteName}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-slate-300 font-mono mt-1 space-y-0.5">
+                              <p>
+                                <span className="text-slate-400">Tim:</span>{' '}
+                                <strong className="text-amber-300">Team {team.teamNumber} - {team.name}</strong> ({team.phone})
+                              </p>
+                              <p>
+                                <span className="text-slate-400">Site ID / Nomor Site:</span>{' '}
+                                <strong className="text-emerald-300 font-mono">{siteId}</strong>
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Action Buttons: REOPEN & HAPUS */}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {onReopenPackage && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (window.confirm(`Buka kembali (REOPEN) paket site "${siteName}" ke Paket Site Aktif?`)) {
+                                    onReopenPackage(team.id, cPkg.packageId);
+                                  }
+                                }}
+                                className="px-2 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500 hover:text-slate-950 text-amber-300 border border-amber-500/40 text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-sm active:scale-95"
+                                title="Buka Kembali Paket Site ke Paket Site Aktif"
+                              >
+                                <RotateCcw className="w-3 h-3" />
+                                <span>REOPEN</span>
+                              </button>
+                            )}
+
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (window.confirm(`Hapus permanen riwayat paket site closed "${siteName}"?`)) {
+                                    onDeleteClosedPackage(team.id, cPkg.packageId);
+                                  }
+                                }}
+                                className="p-1 rounded-lg bg-rose-950/40 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-[10px] font-bold transition-all cursor-pointer shadow-sm"
+                                title="Hapus Riwayat Site Closed"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Details Footer */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[11px] font-mono text-slate-400">
+                          <div>
+                            <span>Tanggal CLOSED: </span>
+                            <strong className="text-slate-200">{formattedDate}</strong>
+                          </div>
+                          <div>
+                            <span>Jam CLOSED: </span>
+                            <strong className="text-slate-200">{formattedTime} WIB</strong>
+                          </div>
+                        </div>
+
+                        {noteText && noteText !== '-' && (
+                          <div className="text-[11px] font-mono text-slate-300 bg-slate-950/50 p-1.5 rounded border border-slate-800">
+                            <span className="text-amber-400 font-bold">*NOTE :*</span> {noteText}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
               </div>
             )}
           </div>
