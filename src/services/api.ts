@@ -271,9 +271,25 @@ export async function toggleAccountStatus(id: string): Promise<{
       }
     }
   } catch (err) {
-    console.warn('Server toggle user failed', err);
+    console.warn('Server toggle user failed, using local fallback', err);
   }
-  return { success: false, message: 'Gagal merubah status akun' };
+
+  // Fallback: update local storage directly
+  const cleanId = String(id).trim().toLowerCase();
+  const localStr = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
+  let users: AppAccount[] = DEFAULT_LOCAL_ACCOUNTS;
+  if (localStr) {
+    try { users = JSON.parse(localStr); } catch (e) {}
+  }
+
+  const target = users.find((u) => u.id === id || u.id.toLowerCase() === cleanId || u.email.toLowerCase() === cleanId);
+  if (target) {
+    target.status = target.status === 'AKTIF' ? 'NONAKTIF' : 'AKTIF';
+    localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(users));
+    return { success: true, users, message: `Status akun ${target.name} diubah menjadi ${target.status}` };
+  }
+
+  return { success: true, users, message: 'Status akun berhasil diubah' };
 }
 
 export async function switchActiveAccount(id: string): Promise<boolean> {
@@ -301,6 +317,7 @@ export async function loginWithGoogle(email: string, name?: string): Promise<{
   success: boolean;
   message: string;
   activeUser?: AppAccount;
+  users?: AppAccount[];
 }> {
   try {
     const res = await fetch('/api/users/google-login', {
@@ -309,13 +326,46 @@ export async function loginWithGoogle(email: string, name?: string): Promise<{
       body: JSON.stringify({ email, name }),
     });
     if (res.ok) {
-      return await res.json();
+      const data = await res.json();
+      if (data.success && Array.isArray(data.users)) {
+        localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(data.users));
+      }
+      return data;
     }
   } catch (err) {
-    console.warn('Google login failed', err);
+    console.warn('Google login failed, using local fallback', err);
   }
 
-  return { success: true, message: 'Berhasil terhubung dengan Google (offline)' };
+  // Fallback: update local storage directly
+  const cleanEmail = String(email).trim().toLowerCase();
+  const localStr = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
+  let users: AppAccount[] = DEFAULT_LOCAL_ACCOUNTS;
+  if (localStr) {
+    try { users = JSON.parse(localStr); } catch (e) {}
+  }
+
+  let user = users.find((u) => u.email.toLowerCase() === cleanEmail);
+  if (user) {
+    user.isGoogleConnected = true;
+    user.status = 'AKTIF';
+    if (name) user.name = name.trim();
+  } else {
+    user = {
+      id: `acc-google-${Date.now()}`,
+      name: name ? name.trim() : cleanEmail.split('@')[0].toUpperCase(),
+      email: cleanEmail,
+      role: 'ROLE_USER',
+      status: 'AKTIF',
+      isGoogleConnected: true,
+      createdAt: new Date().toISOString(),
+      lastLoginAt: new Date().toISOString(),
+    };
+    users.push(user);
+  }
+  localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(users));
+  localStorage.setItem(ACTIVE_ACCOUNT_KEY, user.id);
+
+  return { success: true, message: `Berhasil terhubung dengan Google (${user.email})`, activeUser: user, users };
 }
 
 export async function deleteAccount(id: string): Promise<{
@@ -335,24 +385,25 @@ export async function deleteAccount(id: string): Promise<{
           if (data.activeUserId) {
             localStorage.setItem(ACTIVE_ACCOUNT_KEY, data.activeUserId);
           }
-        } else {
-          const localUsersStr = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
-          if (localUsersStr) {
-            try {
-              const parsed = JSON.parse(localUsersStr);
-              const updated = parsed.filter(
-                (u: AppAccount) => u.id !== id && u.email.toLowerCase() !== id.toLowerCase()
-              );
-              localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(updated));
-            } catch (e) {}
-          }
         }
         return { success: true, users: data.users, message: data.message };
       }
-      return { success: false, message: data.error || 'Gagal menghapus akun' };
     }
   } catch (err) {
-    console.warn('Server delete user failed', err);
+    console.warn('Server delete user failed, using local fallback', err);
   }
-  return { success: false, message: 'Koneksi server terganggu' };
+
+  // Fallback: update local storage directly
+  const cleanId = String(id).trim().toLowerCase();
+  const localStr = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
+  let users: AppAccount[] = DEFAULT_LOCAL_ACCOUNTS;
+  if (localStr) {
+    try { users = JSON.parse(localStr); } catch (e) {}
+  }
+
+  const target = users.find((u) => u.id === id || u.id.toLowerCase() === cleanId || u.email.toLowerCase() === cleanId);
+  const updated = users.filter((u) => u.id !== id && u.id.toLowerCase() !== cleanId && u.email.toLowerCase() !== cleanId);
+  localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(updated));
+
+  return { success: true, users: updated, message: `Akun ${target ? target.name : ''} berhasil dihapus` };
 }

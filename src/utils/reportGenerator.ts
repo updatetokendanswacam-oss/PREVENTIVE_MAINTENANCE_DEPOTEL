@@ -25,7 +25,7 @@ export function generateWhatsAppReport(data: DailyReportData): string {
   const lines: string[] = [];
 
   // Header
-  lines.push('*Daily Reporting. DEPOTEL*');
+  lines.push('*Daily Reporting DEPOTEL*');
   lines.push('');
   lines.push(`*Day/Date : ${data.dateInfo.formatted}*`);
   lines.push('');
