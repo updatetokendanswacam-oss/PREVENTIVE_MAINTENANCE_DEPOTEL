@@ -22,7 +22,7 @@ interface ReportPreviewModalProps {
   onClose: () => void;
   onSaveToHistory: () => void;
   onShowToast: (message: string, type?: 'success' | 'error' | 'info') => void;
-  onSaveCustomReport?: (customText: string) => Promise<void> | void;
+  onSaveCustomReport?: (customText: string, isPermanentEdit?: boolean) => Promise<void> | void;
   onResetCustomReport?: () => Promise<void> | void;
 }
 
@@ -38,14 +38,23 @@ export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({
   if (!isOpen) return null;
 
   const storageKey = `depotel_custom_wa_${reportData.id}`;
+  const lockKey = `depotel_custom_wa_is_edited_${reportData.id}`;
 
   // Calculate live report text from current WebApp data for on-demand sync
   const liveGeneratedText = useMemo(() => {
     return generateWhatsAppReport(reportData);
   }, [reportData]);
 
+  // Determine if this report was user-edited and locked permanently
+  const isLockedAsCustom = useMemo(() => {
+    return (
+      reportData.isCustomWhatsAppEdited === true ||
+      localStorage.getItem(lockKey) === 'true'
+    );
+  }, [reportData.id, reportData.isCustomWhatsAppEdited]);
+
   // Determine initial text:
-  // Prioritizes saved custom report (from DB or localStorage) so it remains permanent and unchanged
+  // Strictly prioritizes user-saved custom report so it remains 100% permanent and NEVER reverts
   const getInitialText = () => {
     if (reportData.customWhatsAppReport && reportData.customWhatsAppReport.trim().length > 0) {
       return reportData.customWhatsAppReport;
@@ -53,6 +62,11 @@ export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({
     const savedLocal = localStorage.getItem(storageKey);
     if (savedLocal && savedLocal.trim().length > 0) {
       return savedLocal;
+    }
+    // Check fallback global permanent latest if marked as edited
+    const globalLatest = localStorage.getItem('depotel_custom_wa_permanent_latest');
+    if (globalLatest && globalLatest.trim().length > 0 && isLockedAsCustom) {
+      return globalLatest;
     }
     return liveGeneratedText;
   };
@@ -64,31 +78,35 @@ export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({
   const [copied, setCopied] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
-  // Sync state whenever modal opens or report date changes (reportData.id)
-  // WebApp data updates will NOT reset or overwrite this text, keeping it permanent!
+  // Sync state when modal opens or report ID changes.
+  // CRITICAL: Saved custom edits are locked and will NEVER be overwritten or revert back!
   useEffect(() => {
     if (!isOpen) return;
 
+    const isUserEdited =
+      reportData.isCustomWhatsAppEdited === true ||
+      localStorage.getItem(lockKey) === 'true';
+
     const saved = reportData.customWhatsAppReport || localStorage.getItem(storageKey);
+
     if (saved && saved.trim().length > 0) {
       setCurrentText(saved);
       setDraftText(saved);
       setHasCustomSaved(true);
+    } else if (isUserEdited) {
+      const globalLatest = localStorage.getItem('depotel_custom_wa_permanent_latest');
+      const textToUse = globalLatest && globalLatest.trim().length > 0 ? globalLatest : liveGeneratedText;
+      setCurrentText(textToUse);
+      setDraftText(textToUse);
+      setHasCustomSaved(true);
     } else {
-      // Auto-save initial generated text permanently if not yet created
       const initialText = liveGeneratedText;
       setCurrentText(initialText);
       setDraftText(initialText);
-      setHasCustomSaved(true);
-      try {
-        localStorage.setItem(storageKey, initialText);
-      } catch (e) {}
-      if (onSaveCustomReport) {
-        onSaveCustomReport(initialText);
-      }
+      setHasCustomSaved(false);
     }
     setIsEditing(false);
-  }, [isOpen, reportData.id, reportData.customWhatsAppReport]);
+  }, [isOpen, reportData.id, reportData.customWhatsAppReport, reportData.isCustomWhatsAppEdited]);
 
   const handleStartEdit = () => {
     setDraftText(currentText);
@@ -109,21 +127,23 @@ export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({
 
     setIsSaving(true);
     try {
-      // 1. Save to localStorage permanently
+      // 1. Save to localStorage permanently with permanent lock flag
       try {
         localStorage.setItem(storageKey, textToSave);
+        localStorage.setItem(lockKey, 'true');
+        localStorage.setItem('depotel_custom_wa_permanent_latest', textToSave);
       } catch (e) {
         console.warn('Local storage save error', e);
       }
 
-      // 2. Update state
+      // 2. Update local state
       setCurrentText(textToSave);
       setHasCustomSaved(true);
       setIsEditing(false);
 
-      // 3. Persist to server / app state permanently
+      // 3. Persist to server / app state permanently (isPermanentEdit = true)
       if (onSaveCustomReport) {
-        await onSaveCustomReport(textToSave);
+        await onSaveCustomReport(textToSave, true);
       }
 
       onShowToast('Teks laporan WhatsApp tersimpan secara permanen!', 'success');
@@ -147,10 +167,14 @@ export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({
       // Save the newly refreshed text permanently
       try {
         localStorage.setItem(storageKey, generated);
-      } catch (e) {}
+        localStorage.setItem(lockKey, 'true');
+        localStorage.setItem('depotel_custom_wa_permanent_latest', generated);
+      } catch (e) {
+        console.warn('Storage save error', e);
+      }
 
       if (onSaveCustomReport) {
-        await onSaveCustomReport(generated);
+        await onSaveCustomReport(generated, true);
       }
 
       onShowToast('Teks laporan diperbarui dari data WebApp & tersimpan permanen!', 'success');
@@ -196,15 +220,24 @@ export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({
                 <h3 className="text-base sm:text-lg font-bold text-white truncate">
                   Preview Laporan WhatsApp
                 </h3>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-amber-400" />
-                  Tersimpan Permanen
-                </span>
+                {isLockedAsCustom ? (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 shadow-sm">
+                    <Sparkles className="w-3 h-3 text-emerald-400" />
+                    Format Editan Permanen
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-amber-400" />
+                    Auto-Sync WebApp
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-400 truncate mt-0.5">
                 {isEditing
                   ? 'Mode Edit: Ubah isi laporan langsung & simpan permanen'
-                  : 'Tersimpan permanen & tidak berubah saat data WebApp diperbarui'}
+                  : isLockedAsCustom
+                  ? 'Tersimpan permanen & tidak balik lagi ke semula saat data WebApp diperbarui'
+                  : 'Tersimpan otomatis sesuai data operasional WebApp'}
               </p>
             </div>
           </div>

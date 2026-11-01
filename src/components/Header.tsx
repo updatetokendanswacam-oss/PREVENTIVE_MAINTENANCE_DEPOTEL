@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { ReportDateInfo, AppAccount } from '../types/reporting';
 import { createReportDateInfo } from '../utils/dateUtils';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface HeaderProps {
   dateInfo: ReportDateInfo;
@@ -98,11 +99,15 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 type="button"
                 onClick={() => onChangeTab('beranda')}
-                className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 via-amber-500 to-amber-700 p-0.5 shadow-lg shadow-amber-500/20 hover:scale-105 transition-transform flex-shrink-0 cursor-pointer"
+                className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-400 via-amber-500 to-amber-700 p-0.5 shadow-lg shadow-amber-500/20 hover:scale-105 transition-transform flex-shrink-0 cursor-pointer overflow-hidden"
                 title="Kembali ke Beranda"
               >
-                <div className="w-full h-full bg-[#0b132b] rounded-[10px] flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-amber-400 animate-pulse" />
+                <div className="w-full h-full bg-[#0b132b] rounded-[10px] overflow-hidden flex items-center justify-center">
+                  <img
+                    src="/logo.png"
+                    alt="DEPOTEL Preventive Maintenance Emblem"
+                    className="w-full h-full object-cover"
+                  />
                 </div>
               </button>
 
@@ -235,6 +240,9 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Action Buttons */}
             <div className="flex items-center gap-2">
+              {/* PWA Install Button */}
+              <PWAInstallButton />
+
               <button
                 onClick={onOpenHistory}
                 className="px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-all"

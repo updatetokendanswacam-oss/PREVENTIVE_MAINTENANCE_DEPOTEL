@@ -13,6 +13,7 @@ import { AdminPinModal } from './components/AdminPinModal';
 import { ToastContainer } from './components/Toast';
 import { FooterNav } from './components/FooterNav';
 import { SettingsView } from './components/SettingsView';
+import { OfflineIndicator } from './components/OfflineIndicator';
 
 import {
   DailyReportData,
@@ -209,7 +210,7 @@ export default function App() {
   }
 
   // Helper to ensure any operational update (sites, packages, genset, categories, etc.)
-  // updates the dashboard data and automatically regenerates and permanently saves the WhatsApp report
+  // updates the dashboard data while strictly preserving permanently saved custom WhatsApp reports
   const applyDashboardUpdate = async (
     dataUpdater: (prev: DailyReportData) => DailyReportData,
     toastMsg?: { message: string; type?: 'success' | 'error' | 'info' },
@@ -217,12 +218,26 @@ export default function App() {
   ) => {
     const updated = dataUpdater(reportData);
     
-    // User request: "ketika ada penambahan site di list tim yang pertama untuk Preview Laporan WhatsApp akan berubah sesuai dengan yang di tambahkan, ketika menambahkan list site yang ke dua yang pertama akan terganti seperti baru lagi, jangan bikin list site dobel sesuaikan dengan otomatis"
-    const newWhatsAppText = regenerateWhatsApp
-      ? generateWhatsAppReport(updated)
-      : (reportData.customWhatsAppReport || 
-         localStorage.getItem(`depotel_custom_wa_${reportData.id}`) || 
-         generateWhatsAppReport(updated));
+    // Check if user has explicitly edited and saved WhatsApp report permanently
+    const lockKey = `depotel_custom_wa_is_edited_${reportData.id}`;
+    const isCustomLocked = 
+      reportData.isCustomWhatsAppEdited === true || 
+      localStorage.getItem(lockKey) === 'true';
+
+    const savedCustomReport = 
+      reportData.customWhatsAppReport || 
+      localStorage.getItem(`depotel_custom_wa_${reportData.id}`);
+
+    let newWhatsAppText: string;
+
+    // If the user has permanently edited and saved the WhatsApp report, NEVER revert or overwrite it with auto-generator!
+    if (isCustomLocked && savedCustomReport && savedCustomReport.trim().length > 0) {
+      newWhatsAppText = savedCustomReport;
+    } else if (regenerateWhatsApp) {
+      newWhatsAppText = generateWhatsAppReport(updated);
+    } else {
+      newWhatsAppText = savedCustomReport || generateWhatsAppReport(updated);
+    }
 
     try {
       localStorage.setItem(`depotel_custom_wa_${reportData.id}`, newWhatsAppText);
@@ -233,6 +248,7 @@ export default function App() {
     const cleanUpdated: DailyReportData = {
       ...updated,
       customWhatsAppReport: newWhatsAppText,
+      isCustomWhatsAppEdited: isCustomLocked,
       updatedAt: new Date().toISOString(),
     };
 
@@ -502,29 +518,54 @@ export default function App() {
     });
 
     // 2. Mark package items as isClosed: true and status: 'DONE'
-    const targetItemIds = new Set([
-      pkg.siteItem?.id,
-      pkg.towerItem?.id,
-      pkg.easItem?.id,
-    ].filter(Boolean));
-
     const newTeams = reportData.teams.map((t) => {
       if (t.id !== teamId) return t;
+
+      const updatedSiteItem: SiteItem = {
+        ...pkg.siteItem,
+        packageId: pkg.packageId,
+        isClosed: true,
+        status: 'DONE',
+        closedAt: closedDateStr,
+        closedCategoryTitle: 'PM SITE NOP & SPACE TOWER',
+      };
+
+      const updatedTowerItem: SiteItem = {
+        ...pkg.towerItem,
+        id: pkg.towerItem?.id || `${pkg.packageId}-tower`,
+        packageId: pkg.packageId,
+        packageRole: 'tower',
+        text: pkg.towerItem?.text || 'Tower space',
+        isClosed: true,
+        status: 'DONE',
+        closedAt: closedDateStr,
+      };
+
+      const updatedEasItem: SiteItem = {
+        ...pkg.easItem,
+        id: pkg.easItem?.id || `${pkg.packageId}-eas`,
+        packageId: pkg.packageId,
+        packageRole: 'eas',
+        text: pkg.easItem?.text || 'EAS',
+        isClosed: true,
+        status: 'DONE',
+        closedAt: closedDateStr,
+      };
+
+      // Remove any previous versions of this package's items
+      const idsToRemove = new Set([
+        pkg.siteItem?.id,
+        pkg.towerItem?.id,
+        pkg.easItem?.id,
+      ].filter(Boolean));
+
+      const filteredSites = t.sites.filter(
+        (s) => s.packageId !== pkg.packageId && !idsToRemove.has(s.id)
+      );
+
       return {
         ...t,
-        sites: t.sites.map((s): SiteItem => {
-          if (targetItemIds.has(s.id) || (pkg.packageId && s.packageId === pkg.packageId)) {
-            return {
-              ...s,
-              packageId: pkg.packageId,
-              isClosed: true,
-              status: 'DONE' as SiteStatus,
-              closedAt: closedDateStr,
-              closedCategoryTitle: 'PM SITE NOP & SPACE TOWER',
-            };
-          }
-          return s;
-        }),
+        sites: [...filteredSites, updatedSiteItem, updatedTowerItem, updatedEasItem],
       };
     });
 
@@ -534,7 +575,8 @@ export default function App() {
         categories: updatedCategories,
         teams: newTeams,
       }),
-      { message: `Paket '${pkgName}' Closed! Data Laporan Utama (PM Site & Tower Space) bertambah +1` }
+      { message: `Paket '${pkgName}' Closed! Data Laporan Utama (PM Site & Tower Space) bertambah +1` },
+      true
     );
   };
 
@@ -583,7 +625,8 @@ export default function App() {
         categories: updatedCategories,
         teams: newTeams,
       }),
-      { message: 'Paket Site Closed berhasil dihapus' }
+      { message: 'Paket Site Closed berhasil dihapus' },
+      true
     );
   };
 
@@ -643,6 +686,9 @@ export default function App() {
       
       {/* Toast Notifications Container */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+
+      {/* PWA Offline Status Indicator */}
+      <OfflineIndicator />
 
       {/* Main App Header */}
       <Header
@@ -881,18 +927,36 @@ export default function App() {
         onClose={() => setPreviewModalOpen(false)}
         onSaveToHistory={() => persistChanges(reportData, true)}
         onShowToast={showToast}
-        onSaveCustomReport={async (customText: string) => {
+        onSaveCustomReport={async (customText: string, isPermanentEdit: boolean = true) => {
+          try {
+            localStorage.setItem(`depotel_custom_wa_${reportData.id}`, customText);
+            if (isPermanentEdit) {
+              localStorage.setItem(`depotel_custom_wa_is_edited_${reportData.id}`, 'true');
+              localStorage.setItem('depotel_custom_wa_permanent_latest', customText);
+            }
+          } catch (e) {
+            console.warn('Storage save error', e);
+          }
           const updated: DailyReportData = {
             ...reportData,
             customWhatsAppReport: customText,
+            isCustomWhatsAppEdited: isPermanentEdit,
             updatedAt: new Date().toISOString(),
           };
           await persistChanges(updated);
         }}
         onResetCustomReport={async () => {
+          try {
+            localStorage.removeItem(`depotel_custom_wa_is_edited_${reportData.id}`);
+            localStorage.removeItem(`depotel_custom_wa_${reportData.id}`);
+          } catch (e) {
+            console.warn('Storage remove error', e);
+          }
+          const newGenerated = generateWhatsAppReport(reportData);
           const updated: DailyReportData = {
             ...reportData,
-            customWhatsAppReport: undefined,
+            customWhatsAppReport: newGenerated,
+            isCustomWhatsAppEdited: false,
             updatedAt: new Date().toISOString(),
           };
           await persistChanges(updated);

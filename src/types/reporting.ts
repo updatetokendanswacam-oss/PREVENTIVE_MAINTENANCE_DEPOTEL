@@ -69,6 +69,7 @@ export interface DailyReportData {
   gensetFixSites: GensetFixSite[];
   note: string;
   customWhatsAppReport?: string;
+  isCustomWhatsAppEdited?: boolean;
   updatedAt: string;
 }
 
