@@ -1,0 +1,6 @@
+{
+  "name": "Daily Reporting DEPOTEL",
+  "description": "Sistem Laporan Harian DEPOTEL dengan Dashboard Interaktif, Generator WA, dan Penyimpanan Otomatis Real-time.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
