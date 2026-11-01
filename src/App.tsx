@@ -113,13 +113,19 @@ export default function App() {
     initData();
   }, []);
 
-  // Save changes to API & storage
-  const persistChanges = async (newData: DailyReportData, snapshotHistory = false) => {
+  // Save changes to API & storage asynchronously without blocking UI
+  const persistChanges = (newData: DailyReportData, snapshotHistory = false) => {
     setReportData(newData);
     setSyncStatus('saving');
-    const res = await saveDashboardData(newData, snapshotHistory);
-    setSyncStatus('server');
-    return res;
+    saveDashboardData(newData, snapshotHistory)
+      .then((res) => {
+        setSyncStatus('server');
+        return res;
+      })
+      .catch((err) => {
+        console.warn('Background save failed, saved in local cache', err);
+        setSyncStatus('local');
+      });
   };
 
   // Account Management Handlers
@@ -210,8 +216,8 @@ export default function App() {
   }
 
   // Helper to ensure any operational update (sites, packages, genset, categories, etc.)
-  // updates the dashboard data and automatically regenerates and saves the WhatsApp report
-  const applyDashboardUpdate = async (
+  // updates the dashboard data instantly in realtime and preserves custom WhatsApp reports if edited
+  const applyDashboardUpdate = (
     dataUpdater: (prev: DailyReportData) => DailyReportData,
     toastMsg?: { message: string; type?: 'success' | 'error' | 'info' },
     regenerateWhatsApp: boolean = true
@@ -219,23 +225,23 @@ export default function App() {
     const updated = dataUpdater(reportData);
     const lockKey = `depotel_custom_wa_is_edited_${reportData.id}`;
 
+    const isCustomLocked =
+      reportData.isCustomWhatsAppEdited === true ||
+      localStorage.getItem(lockKey) === 'true';
+
+    const savedCustomReport =
+      reportData.customWhatsAppReport ||
+      localStorage.getItem(`depotel_custom_wa_${reportData.id}`);
+
     let newWhatsAppText: string;
 
-    if (regenerateWhatsApp) {
-      // User request:
-      // "perbaiki ketika ada penambahan site di list tim yang pertama untuk Preview Laporan WhatsApp akan berubah sesuai dengan yang di tambahkan,
-      //  ketika menambahkan list site yang ke dua yang pertama akan terganti seperti baru lagi, jangan bikin list site dobel sesuaikan dengan otomatis"
+    // User requirement: "jangan bikin ngerubah sendiri secara otomatis di Preview Laporan WhatsApp ketika sudah di closed"
+    // If the user explicitly custom-edited the WhatsApp text, strictly preserve custom text!
+    if (isCustomLocked && savedCustomReport && savedCustomReport.trim().length > 0) {
+      newWhatsAppText = savedCustomReport;
+    } else if (regenerateWhatsApp) {
       newWhatsAppText = generateWhatsAppReport(updated);
-      try {
-        localStorage.removeItem(lockKey);
-        localStorage.removeItem('depotel_custom_wa_permanent_latest');
-      } catch (e) {
-        console.warn('Local storage clear lock error', e);
-      }
     } else {
-      const savedCustomReport = 
-        reportData.customWhatsAppReport || 
-        localStorage.getItem(`depotel_custom_wa_${reportData.id}`);
       newWhatsAppText = (savedCustomReport && savedCustomReport.trim().length > 0)
         ? savedCustomReport
         : generateWhatsAppReport(updated);
@@ -250,11 +256,16 @@ export default function App() {
     const cleanUpdated: DailyReportData = {
       ...updated,
       customWhatsAppReport: newWhatsAppText,
-      isCustomWhatsAppEdited: regenerateWhatsApp ? false : reportData.isCustomWhatsAppEdited,
+      isCustomWhatsAppEdited: isCustomLocked,
       updatedAt: new Date().toISOString(),
     };
 
-    await persistChanges(cleanUpdated);
+    // Realtime state update: Immediate React re-render without blocking UI thread
+    setReportData(cleanUpdated);
+
+    // Save in background
+    persistChanges(cleanUpdated);
+
     if (toastMsg) {
       showToast(toastMsg.message, toastMsg.type || 'success');
     }

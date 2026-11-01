@@ -17,7 +17,7 @@ interface TeamCardProps {
   onUpdateNote?: (teamId: string, packageId: string, noteText: string) => void;
 }
 
-export const TeamCard: React.FC<TeamCardProps> = ({
+export const TeamCard = React.memo<TeamCardProps>(({
   team,
   isAdmin,
   onEditTeam,
@@ -435,4 +435,4 @@ export const TeamCard: React.FC<TeamCardProps> = ({
 
     </div>
   );
-};
+});
