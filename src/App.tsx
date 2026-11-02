@@ -318,7 +318,7 @@ export default function App() {
     const updated = dataUpdater(reportData);
     const lockKey = `depotel_custom_wa_is_edited_${reportData.id}`;
 
-    const isCustomLocked =
+    let isCustomLocked =
       reportData.isCustomWhatsAppEdited === true ||
       localStorage.getItem(lockKey) === 'true';
 
@@ -329,9 +329,19 @@ export default function App() {
 
     let newWhatsAppText: string;
 
-    if (isCustomLocked && savedCustomReport && savedCustomReport.trim().length > 0) {
-      // User request: "FORMAT PESAN WHATSAPP ketika di edit dan lalu di simpan ketika di simpan akan bener2 tersimpan secara permanen tidak berubah lagi format untuk whatsapp nya"
-      // Strictly preserve permanently saved custom WhatsApp report format across ALL dashboard updates!
+    if (regenerateWhatsApp) {
+      // User request: "bener-bener diperbaik ketika Tambah Paket Site Baru dan di Closed tidak bener-bener tertambahkan pada FORMAT PESAN WHATSAPP"
+      // Immediately regenerate WhatsApp report with the latest active & closed sites!
+      try {
+        localStorage.removeItem(lockKey);
+        localStorage.removeItem(`depotel_custom_wa_${reportData.id}`);
+        localStorage.removeItem('depotel_custom_wa_permanent_latest');
+      } catch (e) {
+        console.warn('Storage clear lock error', e);
+      }
+      newWhatsAppText = generateWhatsAppReport(updated);
+      isCustomLocked = false;
+    } else if (isCustomLocked && savedCustomReport && savedCustomReport.trim().length > 0) {
       newWhatsAppText = savedCustomReport;
     } else {
       newWhatsAppText = generateWhatsAppReport(updated);
@@ -691,7 +701,7 @@ export default function App() {
         teams: newTeams,
       }),
       { message: `Paket '${pkgName}' Closed! Data Laporan Utama (PM Site & Tower Space) bertambah +1` },
-      false // REQUIREMENT #5: DO NOT auto-regenerate or alter Preview Laporan WhatsApp on closed!
+      true
     );
   };
 
