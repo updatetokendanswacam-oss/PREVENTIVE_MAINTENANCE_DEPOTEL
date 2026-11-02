@@ -201,16 +201,25 @@ export default function App() {
 
   const handleSaveAccount = async (accountData: Partial<AppAccount>) => {
     const res = await saveAccount(accountData);
-    const { users } = await fetchAccounts();
-    setAccounts(users);
+    const updatedUsers = res.users || (await fetchAccounts()).users;
+    setAccounts(updatedUsers);
     
-    // User request: "saya tetep menggunakan akun ADMIN DEPOTEL UTAMA yang memegang hak akses , ketika saya menambahkan akun user dan admin tidak beralih ke akun user dan admin , hanya menambahkan saja"
+    // Broadcast account creation across all open tabs / devices in real-time
+    try {
+      if (window.BroadcastChannel) {
+        const bc = new BroadcastChannel('depotel_accounts_channel');
+        bc.postMessage({ type: 'ACCOUNTS_UPDATE', users: updatedUsers });
+        bc.close();
+      }
+    } catch (e) {}
+
+    // Retain current ADMIN DEPOTEL UTAMA session
     setActiveAccount((prev) => {
-      const adminMain = users.find((u) => u.id === 'acc-admin-main') || 
-                        users.find((u) => u.email === 'updatetokendanswacam@gmail.com') ||
-                        users.find((u) => u.role === 'ROLE_ADMIN' && u.status === 'AKTIF');
+      const adminMain = updatedUsers.find((u) => u.id === 'acc-admin-main') || 
+                        updatedUsers.find((u) => u.email === 'updatetokendanswacam@gmail.com') ||
+                        updatedUsers.find((u) => u.role === 'ROLE_ADMIN' && u.status === 'AKTIF');
       if (prev?.id === 'acc-admin-main') return prev;
-      return adminMain || prev || users[0];
+      return adminMain || prev || updatedUsers[0];
     });
     setIsAdmin(true);
     showToast(res.message || 'Akun berhasil ditambahkan', 'success');
@@ -285,9 +294,18 @@ export default function App() {
 
   const handleGoogleLogin = async (email: string, name?: string) => {
     const res = await loginWithGoogle(email, name);
-    const { users, activeUserId } = await fetchAccounts();
-    setAccounts(users);
-    const current = users.find((u) => u.id === activeUserId) || users[0] || null;
+    const updatedUsers = res.users || (await fetchAccounts()).users;
+    setAccounts(updatedUsers);
+
+    try {
+      if (window.BroadcastChannel) {
+        const bc = new BroadcastChannel('depotel_accounts_channel');
+        bc.postMessage({ type: 'ACCOUNTS_UPDATE', users: updatedUsers });
+        bc.close();
+      }
+    } catch (e) {}
+
+    const current = updatedUsers.find((u) => u.id === res.activeUser?.id || u.email.toLowerCase() === email.toLowerCase()) || updatedUsers[0] || null;
     setActiveAccount(current);
     if (current) {
       setIsAdmin(current.role === 'ROLE_ADMIN' && current.status === 'AKTIF');

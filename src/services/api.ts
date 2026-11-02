@@ -234,6 +234,7 @@ export async function saveAccount(account: Partial<AppAccount>): Promise<{
   success: boolean;
   message: string;
   account?: AppAccount;
+  users?: AppAccount[];
 }> {
   try {
     const res = await fetch('/api/users', {
@@ -243,13 +244,54 @@ export async function saveAccount(account: Partial<AppAccount>): Promise<{
     });
     if (res.ok) {
       const data = await res.json();
+      if (data.success && Array.isArray(data.users)) {
+        localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(data.users));
+      }
       return data;
     }
   } catch (err) {
-    console.warn('Server save user failed', err);
+    console.warn('Server save user failed, using local fallback', err);
   }
 
-  return { success: true, message: 'Akun disimpan secara lokal' };
+  // Fallback: update local storage directly
+  const cleanEmail = String(account.email || '').trim().toLowerCase();
+  const localStr = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
+  let users: AppAccount[] = DEFAULT_LOCAL_ACCOUNTS;
+  if (localStr) {
+    try { users = JSON.parse(localStr); } catch (e) {}
+  }
+
+  const existingIdx = users.findIndex((u) => u.id === account.id || u.email.toLowerCase() === cleanEmail);
+  let targetAcc: AppAccount;
+
+  if (existingIdx >= 0) {
+    users[existingIdx] = {
+      ...users[existingIdx],
+      name: account.name ? account.name.trim() : users[existingIdx].name,
+      email: cleanEmail || users[existingIdx].email,
+      role: account.role || users[existingIdx].role,
+      status: account.status || users[existingIdx].status,
+      isGoogleConnected: account.isGoogleConnected !== undefined ? account.isGoogleConnected : users[existingIdx].isGoogleConnected,
+      lastLoginAt: new Date().toISOString(),
+    };
+    targetAcc = users[existingIdx];
+  } else {
+    targetAcc = {
+      id: account.id || `acc-${Date.now()}`,
+      name: (account.name || 'USER').trim(),
+      email: cleanEmail,
+      role: account.role === 'ROLE_ADMIN' ? 'ROLE_ADMIN' : 'ROLE_USER',
+      status: account.status === 'NONAKTIF' ? 'NONAKTIF' : 'AKTIF',
+      isGoogleConnected: account.isGoogleConnected !== undefined ? Boolean(account.isGoogleConnected) : true,
+      createdAt: new Date().toISOString(),
+      lastLoginAt: new Date().toISOString(),
+    };
+    users.push(targetAcc);
+  }
+
+  localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(users));
+
+  return { success: true, message: `Akun ${targetAcc.name} berhasil disimpan`, account: targetAcc, users };
 }
 
 export async function toggleAccountStatus(id: string): Promise<{
