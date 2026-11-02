@@ -67,6 +67,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [accountRoleFilter, setAccountRoleFilter] = useState<'ALL' | 'ADMIN' | 'USER'>('ALL');
 
   // GitHub & Vercel Sync State
   const [githubRepo, setGithubRepo] = useState(() => {
@@ -577,9 +578,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </form>
         )}
 
-        {/* List of Accounts */}
-        <div className="space-y-3">
-          {accounts.map((acc) => {
+        {/* Category Tabs / Role Filter */}
+        {(() => {
+          const adminAccounts = accounts.filter((a) => a.role === 'ROLE_ADMIN');
+          const userAccounts = accounts.filter((a) => a.role === 'ROLE_USER');
+
+          const renderAccountCard = (acc: AppAccount) => {
             const isCurrent = activeAccount?.id === acc.id;
             const accIsAdmin = acc.role === 'ROLE_ADMIN';
             const accIsAktif = acc.status === 'AKTIF';
@@ -743,8 +747,92 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </div>
               </div>
             );
-          })}
-        </div>
+          };
+
+          return (
+            <div className="space-y-5">
+              {/* Category Selection Filter Tabs */}
+              <div className="flex items-center gap-2 border-b border-slate-800 pb-3 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setAccountRoleFilter('ALL')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    accountRoleFilter === 'ALL'
+                      ? 'bg-amber-500 text-slate-950 shadow-md'
+                      : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                  }`}
+                >
+                  Semua Akun Terdaftar ({accounts.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAccountRoleFilter('ADMIN')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    accountRoleFilter === 'ADMIN'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-md'
+                      : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                  }`}
+                >
+                  <Shield className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Daftar Akun Admin ({adminAccounts.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAccountRoleFilter('USER')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    accountRoleFilter === 'USER'
+                      ? 'bg-blue-500/20 text-blue-300 border border-blue-500/50 shadow-md'
+                      : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                  }`}
+                >
+                  <User className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Daftar Akun User ({userAccounts.length})</span>
+                </button>
+              </div>
+
+              {/* Categorized List Render */}
+              <div className="space-y-4">
+                {/* 1. AKUN ADMIN CATEGORY SECTION */}
+                {(accountRoleFilter === 'ALL' || accountRoleFilter === 'ADMIN') && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-bold text-amber-300 font-mono tracking-wide px-1">
+                      <Shield className="w-4 h-4 text-amber-400" />
+                      <span>DAFTAR AKUN ADMIN (ROLE_ADMIN) - {adminAccounts.length} AKUN</span>
+                    </div>
+                    {adminAccounts.length === 0 ? (
+                      <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-500 font-mono">
+                        Belum ada akun Admin tambahan terdaftar.
+                      </div>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {adminAccounts.map((acc) => renderAccountCard(acc))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 2. AKUN USER CATEGORY SECTION */}
+                {(accountRoleFilter === 'ALL' || accountRoleFilter === 'USER') && (
+                  <div className="space-y-2 pt-2">
+                    <div className="flex items-center gap-2 text-xs font-bold text-blue-300 font-mono tracking-wide px-1">
+                      <User className="w-4 h-4 text-blue-400" />
+                      <span>DAFTAR AKUN USER (ROLE_USER) - {userAccounts.length} AKUN</span>
+                    </div>
+                    {userAccounts.length === 0 ? (
+                      <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-500 font-mono">
+                        Belum ada akun User terdaftar. Gunakan form "+ Tambah Akun Baru" di atas.
+                      </div>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {userAccounts.map((acc) => renderAccountCard(acc))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* 4. INTEGRASI GITHUB & VERCEL REALTIME (AUTO-SYNC DATABASE) */}
