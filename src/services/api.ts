@@ -174,6 +174,17 @@ const DEFAULT_LOCAL_ACCOUNTS: AppAccount[] = [
     lastLoginAt: new Date().toISOString(),
   },
   {
+    id: 'acc-admin-junaedi',
+    name: 'Muhamad Junaedi',
+    email: 'muhamadjunaedi057@gmail.com',
+    role: 'ROLE_ADMIN',
+    status: 'AKTIF',
+    isGoogleConnected: true,
+    department: 'Admin Team',
+    createdAt: new Date().toISOString(),
+    lastLoginAt: new Date().toISOString(),
+  },
+  {
     id: 'acc-user-field',
     name: 'USER OPERASIONAL NOP',
     email: 'field.depotel@gmail.com',
