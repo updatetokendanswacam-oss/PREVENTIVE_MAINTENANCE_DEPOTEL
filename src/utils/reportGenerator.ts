@@ -82,20 +82,8 @@ export function generateWhatsAppReport(data: DailyReportData): string {
 
     const { activePackages, closedPackages } = groupSitesIntoPackages(team.sites);
 
-    // Sort closed packages chronologically by closed timestamp
-    const sortedClosedPackages = [...closedPackages].sort((a, b) => {
-      const timeA = a.closedAt ? new Date(a.closedAt).getTime() : 0;
-      const timeB = b.closedAt ? new Date(b.closedAt).getTime() : 0;
-      return timeA - timeB;
-    });
-
-    // Rule: When adding a second site list to a team, show the latest site package so the first one is replaced (like new again) in FORMAT PESAN WHATSAPP
-    let packagesToDisplay: typeof activePackages = [];
-    if (activePackages.length > 0) {
-      packagesToDisplay = [activePackages[activePackages.length - 1]];
-    } else if (sortedClosedPackages.length > 0) {
-      packagesToDisplay = [sortedClosedPackages[sortedClosedPackages.length - 1]];
-    }
+    // All packages (both active AND closed sites) must appear in Preview Laporan WhatsApp!
+    const packagesToDisplay = [...activePackages, ...closedPackages];
 
     if (packagesToDisplay.length === 0) {
       lines.push('- Tidak ada site -');
