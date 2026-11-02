@@ -6,24 +6,34 @@
     <script>
       (function() {
         window.addEventListener('error', function(event) {
-          if (event && event.message && (event.message.includes('WebSocket') || event.message.includes('vite'))) {
+          if (event && (event.message && (event.message.includes('WebSocket') || event.message.includes('vite')) || event.filename && event.filename.includes('vite'))) {
             event.stopImmediatePropagation();
+            if (event.preventDefault) event.preventDefault();
           }
         }, true);
         window.addEventListener('unhandledrejection', function(event) {
           if (event && event.reason && (String(event.reason).includes('WebSocket') || String(event.reason).includes('vite'))) {
             event.stopImmediatePropagation();
-            event.preventDefault();
+            if (event.preventDefault) event.preventDefault();
           }
-        });
+        }, true);
         const OrigWebSocket = window.WebSocket;
         if (OrigWebSocket) {
           window.WebSocket = function(url, protocols) {
-            const ws = protocols ? new OrigWebSocket(url, protocols) : new OrigWebSocket(url);
-            ws.addEventListener('error', function(e) {
-              if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
-            }, true);
-            return ws;
+            try {
+              const ws = protocols ? new OrigWebSocket(url, protocols) : new OrigWebSocket(url);
+              ws.addEventListener('error', function(e) {
+                if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
+              }, true);
+              return ws;
+            } catch (err) {
+              return {
+                addEventListener: function() {},
+                removeEventListener: function() {},
+                close: function() {},
+                send: function() {}
+              };
+            }
           };
           window.WebSocket.prototype = OrigWebSocket.prototype;
           window.WebSocket.CONNECTING = OrigWebSocket.CONNECTING;
