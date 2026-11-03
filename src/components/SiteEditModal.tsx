@@ -241,16 +241,20 @@ export const SiteEditModal: React.FC<SiteEditModalProps> = ({
                     type="button"
                     key={`${s.siteId}-${s.siteName}`}
                     onClick={() => handleSelectSuggestion(s)}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-xs flex items-center justify-between transition-colors"
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-xs flex items-center justify-between transition-colors cursor-pointer"
                   >
                     <div>
                       <span className="font-bold text-amber-300 font-mono">{s.siteId}</span>
                       <span className="text-white ml-2 font-mono">{s.siteName}</span>
-                      {s.subdistrict && (
-                        <span className="text-[10px] text-slate-400 block">{s.subdistrict}, {s.city}</span>
+                      {(s.nop || s.subdistrict || s.city) && (
+                        <span className="text-[10px] text-slate-400 block font-mono">
+                          {s.nop || `${s.subdistrict || ''} ${s.city || ''}`}
+                        </span>
                       )}
                     </div>
-                    <span className="text-[10px] text-amber-400 font-mono">✓ Master Site</span>
+                    <span className="text-[10px] text-amber-400 font-mono font-bold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/30">
+                      ✓ Google Sheet
+                    </span>
                   </button>
                 ))}
               </div>
