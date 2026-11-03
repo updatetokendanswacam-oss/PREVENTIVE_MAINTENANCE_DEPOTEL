@@ -27,11 +27,12 @@ import {
   UserPlus,
   Users,
 } from 'lucide-react';
-import { AppAccount, UserRole, AccountStatus, AuditLog } from '../types/reporting';
+import { AppAccount, UserRole, AccountStatus, AuditLog, TeamData } from '../types/reporting';
 
 interface SettingsViewProps {
   accounts: AppAccount[];
   activeAccount: AppAccount | null;
+  teams?: TeamData[];
   auditLogs?: AuditLog[];
   onSwitchAccount: (id: string) => void;
   onSaveAccount: (account: Partial<AppAccount>) => Promise<void>;
@@ -45,6 +46,7 @@ interface SettingsViewProps {
 export const SettingsView: React.FC<SettingsViewProps> = ({
   accounts,
   activeAccount,
+  teams = [],
   auditLogs = [],
   onSwitchAccount,
   onSaveAccount,
@@ -94,15 +96,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [syncSuccessMsg, setSyncSuccessMsg] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  const teamOptions = [
+  const dynamicTeamOptions = [
     { id: 'ALL', label: 'Semua Tim (Akses Penuh / Admin)' },
-    { id: 'team-1', label: 'Team 1 - SAMIN (082374227775)' },
-    { id: 'team-2', label: 'Team 2 - MUHAMAD JUNAEDI (08119234976)' },
-    { id: 'team-3', label: 'Team 3 - RANDI AFDIANSYAH (08131423533)' },
-    { id: 'team-4', label: 'Team 4 - KOSASIH (08119234974)' },
-    { id: 'team-5', label: 'Team 5 - ROMI HENDRA GUNAWAN (081319012052)' },
-    { id: 'team-6', label: 'Team 6 - ROY ISHARRYANTO (081286241842)' },
+    ...(teams && teams.length > 0
+      ? teams.map((t) => ({
+          id: t.id,
+          label: `Team ${t.teamNumber || ''} - ${t.name}${t.phone ? ` (${t.phone})` : ''}`,
+        }))
+      : [
+          { id: 'team-1', label: 'Team 1 - SAMIN (082374227775)' },
+          { id: 'team-2', label: 'Team 2 - MUHAMAD JUNAEDI (08119234976)' },
+          { id: 'team-3', label: 'Team 3 - RANDI AFDIANSYAH (08131423533)' },
+          { id: 'team-4', label: 'Team 4 - KOSASIH (08119234974)' },
+          { id: 'team-5', label: 'Team 5 - ROMI HENDRA GUNAWAN (081319012052)' },
+          { id: 'team-6', label: 'Team 6 - ROY ISHARRYANTO (081286241842)' },
+        ]),
   ];
+  const teamOptions = dynamicTeamOptions;
 
   const handleSaveGithubVercelConfig = (e: React.FormEvent) => {
     e.preventDefault();
@@ -653,14 +663,39 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2 text-xs text-slate-400 font-mono mt-0.5 flex-wrap">
+                    <div className="flex items-center gap-2 text-xs text-slate-400 font-mono mt-1 flex-wrap">
                       <div className="flex items-center gap-1">
                         <Mail className="w-3 h-3 text-slate-500" />
                         <span>{acc.email}</span>
                       </div>
-                      {acc.assignedTeamId && acc.assignedTeamId !== 'ALL' && (
+                      {isAdmin ? (
+                        <div className="flex items-center gap-1 bg-slate-900 border border-slate-700/80 rounded-lg px-2 py-0.5">
+                          <span className="text-[10px] text-amber-400 font-bold font-mono">Hak Akses Tim:</span>
+                          <select
+                            value={acc.assignedTeamId || 'ALL'}
+                            onChange={async (e) => {
+                              const selected = e.target.value;
+                              await onSaveAccount({
+                                ...acc,
+                                assignedTeamId: selected,
+                              });
+                            }}
+                            className="bg-slate-950 text-[10px] font-mono text-amber-300 font-bold border border-slate-800 rounded px-1.5 py-0.5 focus:outline-none focus:border-amber-400 cursor-pointer"
+                          >
+                            {teamOptions.map((t) => (
+                              <option key={t.id} value={t.id}>
+                                {t.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : acc.assignedTeamId && acc.assignedTeamId !== 'ALL' ? (
                         <span className="text-[10px] text-amber-300 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20 font-bold">
                           📌 Assigned: {teamOptions.find(t => t.id === acc.assignedTeamId)?.label.split(' - ')[0] || acc.assignedTeamId}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-emerald-300 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20 font-bold">
+                          🌐 Akses Semua Tim (Admin / Full)
                         </span>
                       )}
                     </div>

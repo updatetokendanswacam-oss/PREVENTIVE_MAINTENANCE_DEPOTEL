@@ -459,18 +459,22 @@ export default function App() {
 
   const handleSaveTeam = async (teamInfo: Partial<TeamData>) => {
     let newTeams = [...reportData.teams];
+    let createdOrUpdatedTeam: TeamData | null = null;
 
     if (teamInfo.id) {
-      newTeams = newTeams.map((t) =>
-        t.id === teamInfo.id
-          ? {
-              ...t,
-              name: teamInfo.name || t.name,
-              phone: teamInfo.phone || t.phone,
-              teamNumber: teamInfo.teamNumber || t.teamNumber,
-            }
-          : t
-      );
+      newTeams = newTeams.map((t) => {
+        if (t.id === teamInfo.id) {
+          const updated = {
+            ...t,
+            name: teamInfo.name || t.name,
+            phone: teamInfo.phone || t.phone,
+            teamNumber: teamInfo.teamNumber || t.teamNumber,
+          };
+          createdOrUpdatedTeam = updated;
+          return updated;
+        }
+        return t;
+      });
     } else {
       const newTeam: TeamData = {
         id: `team-${Date.now()}`,
@@ -480,13 +484,43 @@ export default function App() {
         sites: [],
       };
       newTeams.push(newTeam);
+      createdOrUpdatedTeam = newTeam;
     }
 
     newTeams.sort((a, b) => a.teamNumber - b.teamNumber);
 
+    // Auto-create or update team user account in accounts list & Firestore
+    if (createdOrUpdatedTeam) {
+      const targetTeam = createdOrUpdatedTeam as TeamData;
+      const existingAcc = accounts.find((a) => a.assignedTeamId === targetTeam.id);
+      if (existingAcc) {
+        await handleSaveAccount({
+          id: existingAcc.id,
+          name: `${targetTeam.name} (TEAM ${targetTeam.teamNumber})`,
+          department: `Team Lapangan ${targetTeam.teamNumber}`,
+        });
+      } else {
+        const cleanName = (targetTeam.name || 'team').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const newTeamAcc: AppAccount = {
+          id: `acc-user-${targetTeam.id}`,
+          name: `${targetTeam.name} (TEAM ${targetTeam.teamNumber})`,
+          email: `${cleanName}${targetTeam.teamNumber || 'X'}.depotel@gmail.com`,
+          role: 'ROLE_USER',
+          status: 'AKTIF',
+          approved: true,
+          assignedTeamId: targetTeam.id,
+          isGoogleConnected: false,
+          department: `Team Lapangan ${targetTeam.teamNumber}`,
+          createdAt: new Date().toISOString(),
+          lastLoginAt: new Date().toISOString(),
+        };
+        await handleSaveAccount(newTeamAcc);
+      }
+    }
+
     await applyDashboardUpdate(
       (prev) => ({ ...prev, teams: newTeams }),
-      { message: teamInfo.id ? 'Data team berhasil diperbarui' : 'Team baru berhasil ditambahkan' },
+      { message: teamInfo.id ? 'Data team berhasil diperbarui' : 'Team baru & akun user team berhasil ditambahkan' },
       true
     );
   };
@@ -987,6 +1021,7 @@ export default function App() {
           <SettingsView
             accounts={accounts}
             activeAccount={activeAccount}
+            teams={reportData.teams}
             auditLogs={auditLogs}
             onSwitchAccount={handleSwitchAccount}
             onSaveAccount={handleSaveAccount}
