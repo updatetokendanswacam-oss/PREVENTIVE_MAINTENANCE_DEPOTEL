@@ -25,9 +25,12 @@ import {
   ReportDateInfo,
   ToastMessage,
   AppAccount,
+  AuditLog,
+  LiveConnectionStatus,
 } from './types/reporting';
 
 import { groupSitesIntoPackages } from './utils/packageUtils';
+import { createReportDateInfo } from './utils/dateUtils';
 
 import {
   fetchDashboardData,
@@ -41,12 +44,28 @@ import {
   deleteAccount,
 } from './services/api';
 
-import { Plus, Send, ShieldAlert, Sparkles, CheckCircle, RefreshCw, Copy, Users } from 'lucide-react';
+import {
+  auth,
+  testConnection,
+  subscribeToDailyReport,
+  subscribeToUsers,
+  subscribeToAuditLogs,
+  saveDailyReportToFirestore,
+  saveUserToFirestore,
+  logAuditActivity,
+  isEmailAdmin,
+  signInWithGooglePopup,
+} from './services/firebase';
+
+import { onAuthStateChanged } from 'firebase/auth';
+
+import { Plus, Users } from 'lucide-react';
 import { generateWhatsAppReport } from './utils/reportGenerator';
 
 export default function App() {
   const [reportData, setReportData] = useState<DailyReportData | null>(null);
-  const [isAdmin, setIsAdmin] = useState<boolean>(true); // Admin state derived from activeAccount
+  const [isAdmin, setIsAdmin] = useState<boolean>(true);
+  const [liveStatus, setLiveStatus] = useState<LiveConnectionStatus>('CONNECTING');
   const [syncStatus, setSyncStatus] = useState<'server' | 'local' | 'saving'>('server');
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [selectedTeamFilter, setSelectedTeamFilter] = useState<string>('ALL');
@@ -57,6 +76,7 @@ export default function App() {
   // User Accounts & Authentication state
   const [accounts, setAccounts] = useState<AppAccount[]>([]);
   const [activeAccount, setActiveAccount] = useState<AppAccount | null>(null);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
 
   // Modals state
   const [categoryToEdit, setCategoryToEdit] = useState<JobCategory | null>(null);
@@ -89,14 +109,16 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // Initial Load: Dashboard Data & Accounts
+  // Initial Load: Test Firestore connection & fetch base data
   useEffect(() => {
     async function initData() {
+      setLiveStatus('CONNECTING');
+      const isConnected = await testConnection();
+
       const { data, source } = await fetchDashboardData();
       setReportData(data);
       setSyncStatus(source);
 
-      // Fetch accounts and ensure user stays as ADMIN DEPOTEL UTAMA
       try {
         const { users } = await fetchAccounts();
         setAccounts(users);
@@ -109,73 +131,102 @@ export default function App() {
       } catch (err) {
         console.warn('Could not load accounts:', err);
       }
+
+      setLiveStatus(isConnected ? 'LIVE' : 'OFFLINE');
     }
     initData();
   }, []);
 
-  // Realtime Sync Listener (BroadcastChannel for multi-tab + 2s Polling for multi-device)
-  const reportDataRef = useRef(reportData);
+  // Firebase Auth Observer & Real-time Firestore Listeners
   useEffect(() => {
-    reportDataRef.current = reportData;
-  }, [reportData]);
+    const unsubscribeAuth = onAuthStateChanged(auth, async (fbUser) => {
+      if (fbUser && fbUser.email) {
+        const cleanEmail = fbUser.email.toLowerCase().trim();
+        const isAdminUser = isEmailAdmin(cleanEmail);
 
+        // Build account payload
+        const userAcc: AppAccount = {
+          id: `acc-fb-${fbUser.uid}`,
+          uid: fbUser.uid,
+          name: fbUser.displayName || cleanEmail.split('@')[0].toUpperCase(),
+          email: cleanEmail,
+          role: isAdminUser ? 'ROLE_ADMIN' : 'ROLE_USER',
+          status: 'AKTIF',
+          approved: true, // Auto-approved on Google Sign-In
+          isGoogleConnected: true,
+          createdAt: new Date().toISOString(),
+          lastLoginAt: new Date().toISOString(),
+        };
+
+        // Save to Firestore
+        await saveUserToFirestore(userAcc);
+        await logAuditActivity('LOGIN_GOOGLE', `User ${userAcc.name} (${userAcc.email}) logged in via Firebase Google Auth`, userAcc.email, userAcc.name, userAcc.role);
+
+        // Update local active state
+        setActiveAccount(userAcc);
+        setIsAdmin(userAcc.role === 'ROLE_ADMIN' && userAcc.status === 'AKTIF');
+        showToast(`Selamat datang, ${userAcc.name}! (Firebase Auth Connected)`, 'success');
+      }
+    });
+
+    return () => unsubscribeAuth();
+  }, [showToast]);
+
+  // Subscribe to real-time Firestore updates for active report date
+  const reportId = reportData?.id || `report-${createReportDateInfo().isoDate}`;
   useEffect(() => {
-    let bc: BroadcastChannel | null = null;
-    let accountsBc: BroadcastChannel | null = null;
-
-    try {
-      if (window.BroadcastChannel) {
-        bc = new BroadcastChannel('depotel_realtime_channel');
-        bc.onmessage = (event) => {
-          if (event.data && event.data.type === 'DASHBOARD_UPDATE' && event.data.data) {
-            if (event.data.data.updatedAt !== reportDataRef.current?.updatedAt) {
-              setReportData(event.data.data);
+    setLiveStatus('CONNECTING');
+    const unsubReport = subscribeToDailyReport(
+      reportId,
+      (remoteData) => {
+        if (remoteData) {
+          setReportData((prev) => {
+            if (remoteData.updatedAt !== prev?.updatedAt) {
+              return remoteData;
             }
-          }
-        };
-
-        accountsBc = new BroadcastChannel('depotel_accounts_channel');
-        accountsBc.onmessage = (event) => {
-          if (event.data && event.data.type === 'ACCOUNTS_UPDATE' && Array.isArray(event.data.users)) {
-            setAccounts(event.data.users);
-          }
-        };
-      }
-    } catch (e) {}
-
-    const syncInterval = setInterval(async () => {
-      if (document.visibilityState === 'visible') {
-        try {
-          const { data } = await fetchDashboardData();
-          if (
-            data &&
-            data.updatedAt &&
-            data.updatedAt !== reportDataRef.current?.updatedAt
-          ) {
-            setReportData(data);
-          }
-
-          const { users } = await fetchAccounts();
-          if (Array.isArray(users)) {
-            setAccounts(users);
-          }
-        } catch (e) {
-          // ignore transient poll error
+            return prev;
+          });
+          setLiveStatus('LIVE');
         }
+      },
+      () => setLiveStatus('OFFLINE')
+    );
+
+    const unsubUsers = subscribeToUsers((remoteUsers) => {
+      if (Array.isArray(remoteUsers) && remoteUsers.length > 0) {
+        setAccounts((prev) => {
+          // Merge remote users with existing users
+          const map = new Map<string, AppAccount>();
+          prev.forEach((u) => map.set(u.id, u));
+          remoteUsers.forEach((u) => map.set(u.id, u));
+          return Array.from(map.values());
+        });
       }
-    }, 2000);
+    });
+
+    const unsubLogs = subscribeToAuditLogs((logs) => {
+      setAuditLogs(logs);
+    });
 
     return () => {
-      if (bc) bc.close();
-      if (accountsBc) accountsBc.close();
-      clearInterval(syncInterval);
+      unsubReport();
+      unsubUsers();
+      unsubLogs();
     };
-  }, []);
+  }, [reportId]);
 
-  // Save changes to API & storage asynchronously without blocking UI
+  // Save changes to API & Firestore asynchronously
   const persistChanges = (newData: DailyReportData, snapshotHistory = false) => {
     setReportData(newData);
     setSyncStatus('saving');
+    setLiveStatus('SYNCING');
+
+    // Save to Firestore
+    saveDailyReportToFirestore(newData)
+      .then(() => setLiveStatus('LIVE'))
+      .catch(() => setLiveStatus('OFFLINE'));
+
+    // Save to Express Backend / localStorage
     saveDashboardData(newData, snapshotHistory)
       .then((res) => {
         setSyncStatus('server');
@@ -200,20 +251,29 @@ export default function App() {
   };
 
   const handleSaveAccount = async (accountData: Partial<AppAccount>) => {
+    setLiveStatus('SYNCING');
     const res = await saveAccount(accountData);
     const updatedUsers = res.users || (await fetchAccounts()).users;
     setAccounts(updatedUsers);
-    
-    // Broadcast account creation across all open tabs / devices in real-time
-    try {
-      if (window.BroadcastChannel) {
-        const bc = new BroadcastChannel('depotel_accounts_channel');
-        bc.postMessage({ type: 'ACCOUNTS_UPDATE', users: updatedUsers });
-        bc.close();
-      }
-    } catch (e) {}
 
-    // Retain current ADMIN DEPOTEL UTAMA session
+    if (accountData.email && accountData.name) {
+      const accToSave: AppAccount = {
+        id: accountData.id || `acc-${Date.now()}`,
+        name: accountData.name,
+        email: accountData.email,
+        role: accountData.role || 'ROLE_USER',
+        status: accountData.status || 'AKTIF',
+        approved: accountData.approved !== undefined ? accountData.approved : true,
+        assignedTeamId: accountData.assignedTeamId || 'ALL',
+        isGoogleConnected: true,
+        createdAt: new Date().toISOString(),
+        lastLoginAt: new Date().toISOString(),
+      };
+      await saveUserToFirestore(accToSave);
+      await logAuditActivity('CREATE_ACCOUNT', `Admin added account ${accToSave.name} (${accToSave.email})`, activeAccount?.email, activeAccount?.name, activeAccount?.role);
+    }
+    setLiveStatus('LIVE');
+
     setActiveAccount((prev) => {
       const adminMain = updatedUsers.find((u) => u.id === 'acc-admin-main') || 
                         updatedUsers.find((u) => u.email === 'updatetokendanswacam@gmail.com') ||
@@ -225,30 +285,35 @@ export default function App() {
     showToast(res.message || 'Akun berhasil ditambahkan', 'success');
   };
 
+  const handleApproveUser = async (id: string, approved: boolean, assignedTeamId?: string) => {
+    setLiveStatus('SYNCING');
+    const target = accounts.find((a) => a.id === id);
+    if (target) {
+      const updatedAcc: AppAccount = {
+        ...target,
+        approved,
+        assignedTeamId: assignedTeamId || target.assignedTeamId || 'ALL',
+      };
+      await saveUserToFirestore(updatedAcc);
+      await logAuditActivity('APPROVE_USER', `Admin ${approved ? 'approved' : 'pending'} user ${target.name} (${target.email})`, activeAccount?.email, activeAccount?.name, activeAccount?.role);
+      showToast(`Status persetujuan akun ${target.name} diperbarui`, 'success');
+    }
+    setLiveStatus('LIVE');
+  };
+
   const handleToggleStatus = async (id: string) => {
+    setLiveStatus('SYNCING');
     const res = await toggleAccountStatus(id);
     if (res.success && res.users) {
       setAccounts(res.users);
-      if (activeAccount?.id === id) {
-        const updated = res.users.find((u) => u.id === id || u.email.toLowerCase() === id.toLowerCase());
-        if (updated) {
-          setActiveAccount(updated);
-          setIsAdmin(updated.role === 'ROLE_ADMIN' && updated.status === 'AKTIF');
-        }
+      const target = res.users.find((u) => u.id === id);
+      if (target) {
+        await saveUserToFirestore(target);
+        await logAuditActivity('TOGGLE_STATUS', `Admin changed account ${target.name} status to ${target.status}`, activeAccount?.email, activeAccount?.name, activeAccount?.role);
       }
       showToast(res.message || 'Status akun berhasil diubah', 'success');
-
-      // Broadcast account status update in real-time across open tabs/windows
-      try {
-        if (window.BroadcastChannel) {
-          const bc = new BroadcastChannel('depotel_accounts_channel');
-          bc.postMessage({ type: 'ACCOUNTS_UPDATE', users: res.users });
-          bc.close();
-        }
-      } catch (e) {}
-    } else {
-      showToast(res.message || 'Gagal mengubah status akun', 'error');
     }
+    setLiveStatus('LIVE');
   };
 
   const handleDeleteAccount = async (id: string) => {
@@ -261,56 +326,32 @@ export default function App() {
     }
 
     try {
+      setLiveStatus('SYNCING');
       const res = await deleteAccount(id);
       if (res.success) {
         const updatedUsers = res.users || (await fetchAccounts()).users;
         setAccounts(updatedUsers);
-        setActiveAccount((prev) => {
-          const adminMain = updatedUsers.find((u) => u.id === 'acc-admin-main') || 
-                            updatedUsers.find((u) => u.email === 'updatetokendanswacam@gmail.com');
-          if (prev && prev.id !== id && prev.id === 'acc-admin-main') return prev;
-          return adminMain || updatedUsers[0] || null;
-        });
-        setIsAdmin(true);
-
-        // Broadcast account deletion in real-time across open tabs/windows
-        try {
-          if (window.BroadcastChannel) {
-            const bc = new BroadcastChannel('depotel_accounts_channel');
-            bc.postMessage({ type: 'ACCOUNTS_UPDATE', users: updatedUsers });
-            bc.close();
-          }
-        } catch (e) {}
-
+        await logAuditActivity('DELETE_ACCOUNT', `Admin deleted account ${targetAcc.name} (${targetAcc.email})`, activeAccount?.email, activeAccount?.name, activeAccount?.role);
         showToast(`Akun '${targetAcc.name}' berhasil dihapus permanen!`, 'success');
-      } else {
-        showToast(res.message || `Gagal menghapus akun '${targetAcc.name}'.`, 'error');
       }
     } catch (err) {
       console.error('Delete account error:', err);
-      showToast('Terjadi kesalahan saat menghapus akun', 'error');
+    } finally {
+      setLiveStatus('LIVE');
     }
   };
 
   const handleGoogleLogin = async (email: string, name?: string) => {
-    const res = await loginWithGoogle(email, name);
-    const updatedUsers = res.users || (await fetchAccounts()).users;
-    setAccounts(updatedUsers);
-
+    setLiveStatus('SYNCING');
     try {
-      if (window.BroadcastChannel) {
-        const bc = new BroadcastChannel('depotel_accounts_channel');
-        bc.postMessage({ type: 'ACCOUNTS_UPDATE', users: updatedUsers });
-        bc.close();
-      }
-    } catch (e) {}
-
-    const current = updatedUsers.find((u) => u.id === res.activeUser?.id || u.email.toLowerCase() === email.toLowerCase()) || updatedUsers[0] || null;
-    setActiveAccount(current);
-    if (current) {
-      setIsAdmin(current.role === 'ROLE_ADMIN' && current.status === 'AKTIF');
+      // Try Firebase Sign-In popup first
+      await signInWithGooglePopup();
+    } catch (e) {
+      // Fallback to custom login
+      await loginWithGoogle(email, name);
+    } finally {
+      setLiveStatus('LIVE');
     }
-    showToast(res.message || 'Berhasil masuk dengan Google!', 'success');
   };
 
   if (!reportData) {
@@ -319,15 +360,14 @@ export default function App() {
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-4 border-amber-500/30 border-t-amber-400 rounded-full animate-spin"></div>
           <p className="text-sm font-semibold text-amber-300 font-mono">
-            Memuat Dashboard Daily Reporting DEPOTEL...
+            Memuat Dashboard Daily Reporting DEPOTEL Firestore...
           </p>
         </div>
       </div>
     );
   }
 
-  // Helper to ensure any operational update (sites, packages, genset, categories, etc.)
-  // updates the dashboard data instantly in realtime and handles WhatsApp report updates properly
+  // Helper to apply dashboard updates & broadcast in real-time
   const applyDashboardUpdate = (
     dataUpdater: (prev: DailyReportData) => DailyReportData,
     toastMsg?: { message: string; type?: 'success' | 'error' | 'info' },
@@ -348,8 +388,6 @@ export default function App() {
     let newWhatsAppText: string;
 
     if (regenerateWhatsApp) {
-      // User request: "bener-bener diperbaik ketika Tambah Paket Site Baru dan di Closed tidak bener-bener tertambahkan pada FORMAT PESAN WHATSAPP"
-      // Immediately regenerate WhatsApp report with the latest active & closed sites!
       try {
         localStorage.removeItem(lockKey);
         localStorage.removeItem(`depotel_custom_wa_${reportData.id}`);
@@ -365,40 +403,27 @@ export default function App() {
       newWhatsAppText = generateWhatsAppReport(updated);
     }
 
-    try {
-      localStorage.setItem(`depotel_custom_wa_${reportData.id}`, newWhatsAppText);
-    } catch (e) {
-      console.warn('Storage save error', e);
-    }
-
     const cleanUpdated: DailyReportData = {
       ...updated,
       customWhatsAppReport: newWhatsAppText,
       isCustomWhatsAppEdited: isCustomLocked,
       updatedAt: new Date().toISOString(),
+      lastUpdatedBy: activeAccount?.email || 'Anonymous',
     };
 
-    // Realtime state update: Immediate React re-render without blocking UI thread (0ms)
+    // Immediate React state update
     setReportData(cleanUpdated);
 
-    // Broadcast update across open tabs/windows in realtime (0ms)
-    try {
-      if (window.BroadcastChannel) {
-        const bc = new BroadcastChannel('depotel_realtime_channel');
-        bc.postMessage({ type: 'DASHBOARD_UPDATE', data: cleanUpdated });
-        bc.close();
-      }
-    } catch (e) {}
-
-    // Save in background to server & storage
+    // Save in background to Firestore & Express backend
     persistChanges(cleanUpdated);
 
     if (toastMsg) {
       showToast(toastMsg.message, toastMsg.type || 'success');
+      logAuditActivity('UPDATE_DASHBOARD', toastMsg.message, activeAccount?.email, activeAccount?.name, activeAccount?.role);
     }
   };
 
-  // Handlers
+  // Operational Handlers
   const handleDateChange = async (newDateInfo: ReportDateInfo) => {
     await applyDashboardUpdate(
       (prev) => ({
@@ -436,7 +461,6 @@ export default function App() {
     let newTeams = [...reportData.teams];
 
     if (teamInfo.id) {
-      // Edit existing
       newTeams = newTeams.map((t) =>
         t.id === teamInfo.id
           ? {
@@ -448,7 +472,6 @@ export default function App() {
           : t
       );
     } else {
-      // Create new team
       const newTeam: TeamData = {
         id: `team-${Date.now()}`,
         teamNumber: teamInfo.teamNumber || newTeams.length + 1,
@@ -459,7 +482,6 @@ export default function App() {
       newTeams.push(newTeam);
     }
 
-    // Sort by teamNumber
     newTeams.sort((a, b) => a.teamNumber - b.teamNumber);
 
     await applyDashboardUpdate(
@@ -481,7 +503,7 @@ export default function App() {
     }
   };
 
-  // Package Handlers (Site + Tower Space + EAS)
+  // Package Handlers
   const handleOpenAddSitePackage = (teamId: string) => {
     setSiteEditModal({ isOpen: true, teamId, sitePackage: null });
   };
@@ -501,6 +523,7 @@ export default function App() {
     easText: string;
     easStatus: SiteStatus;
     note?: string;
+    photoUrl?: string;
     lat?: number;
     lng?: number;
   }) => {
@@ -525,6 +548,7 @@ export default function App() {
         lat: packageData.lat,
         lng: packageData.lng,
         note: packageData.note,
+        photoUrl: packageData.photoUrl || sitePackage?.siteItem?.photoUrl,
         isClosed,
       };
 
@@ -548,7 +572,6 @@ export default function App() {
 
       let newSites = [...t.sites];
       if (sitePackage) {
-        // Exclude old items belonging to this package when editing
         const oldIds = new Set([
           sitePackage.siteItem?.id,
           sitePackage.towerItem?.id,
@@ -558,7 +581,6 @@ export default function App() {
         newSites = newSites.filter((s) => !oldIds.has(s.id) && s.packageId !== pkgId);
         newSites.push(siteItem, towerItem, easItem);
       } else {
-        // Adding new site package to team: preserve all existing active & closed sites and append new package!
         newSites.push(siteItem, towerItem, easItem);
       }
 
@@ -635,13 +657,11 @@ export default function App() {
     );
   };
 
-  // Handler for Closed Unified Package (Calculates PM SITE & SPACE TOWER together)
+  // Handler for Closed Unified Package
   const handleClosedPackage = async (teamId: string, pkg: SitePackage) => {
     const closedDateStr = new Date().toISOString();
     const pkgName = pkg.siteItem?.siteName || pkg.siteItem?.text || 'Paket Site';
 
-    // 1. Update DATA LAPORAN UTAMA:
-    // Both PM SITE NOP SOUTHERN and SPACE TOWER get achievement +1 directly together!
     const updatedCategories = reportData.categories.map((cat) => {
       if (cat.id === 'nop_southern' || cat.id === 'space_tower') {
         const newAchievement = cat.achievement + 1;
@@ -660,7 +680,6 @@ export default function App() {
       return cat;
     });
 
-    // 2. Mark package items as isClosed: true and status: 'DONE'
     const newTeams = reportData.teams.map((t) => {
       if (t.id !== teamId) return t;
 
@@ -695,7 +714,6 @@ export default function App() {
         closedAt: closedDateStr,
       };
 
-      // Remove any previous versions of this package's items
       const idsToRemove = new Set([
         pkg.siteItem?.id,
         pkg.towerItem?.id,
@@ -723,9 +741,7 @@ export default function App() {
     );
   };
 
-  // Handler to REOPEN a closed package from Paket Site Closed Hari Ini back to Paket Site Aktif
   const handleReopenPackage = (teamId: string, packageId: string) => {
-    // 1. Decrement achievement for PM SITE NOP SOUTHERN and SPACE TOWER
     const updatedCategories = reportData.categories.map((cat) => {
       if (cat.id === 'nop_southern' || cat.id === 'space_tower') {
         const newAchievement = Math.max(0, cat.achievement - 1);
@@ -742,7 +758,6 @@ export default function App() {
       return cat;
     });
 
-    // 2. Mark package items as isClosed: false and status: 'PROGRESS'
     const newTeams = reportData.teams.map((t) => {
       if (t.id !== teamId) return t;
 
@@ -768,13 +783,11 @@ export default function App() {
         teams: newTeams,
       }),
       { message: 'Paket site berhasil dibuka kembali (Reopened) ke Paket Site Aktif!' },
-      false // REQUIREMENT #5: DO NOT touch Preview Laporan WhatsApp on reopen
+      false
     );
   };
 
-  // Handler to delete a closed package from the closed list (updates Data Laporan Utama)
   const handleDeleteClosedPackage = (teamId: string, packageId: string) => {
-    // 1. Decrement achievement for PM SITE NOP SOUTHERN and SPACE TOWER
     const updatedCategories = reportData.categories.map((cat) => {
       if (cat.id === 'nop_southern' || cat.id === 'space_tower') {
         const newAchievement = Math.max(0, cat.achievement - 1);
@@ -791,7 +804,6 @@ export default function App() {
       return cat;
     });
 
-    // 2. Remove items belonging to this closed package from team.sites
     const newTeams = reportData.teams.map((t) => {
       if (t.id !== teamId) return t;
 
@@ -818,7 +830,7 @@ export default function App() {
         teams: newTeams,
       }),
       { message: 'Paket Site Closed berhasil dihapus' },
-      false // REQUIREMENT #5: DO NOT touch Preview Laporan WhatsApp
+      false
     );
   };
 
@@ -830,6 +842,7 @@ export default function App() {
         id: `genset-${Date.now()}`,
         siteName,
         status,
+        technicianName: activeAccount?.name || 'SAMIN',
       },
     ];
     await applyDashboardUpdate(
@@ -900,6 +913,7 @@ export default function App() {
           }
         }}
         syncStatus={syncStatus}
+        liveStatus={liveStatus}
         onGenerateReport={() => setPreviewModalOpen(true)}
         onOpenHistory={() => setHistoryModalOpen(true)}
         onResetData={handleReset}
@@ -907,6 +921,45 @@ export default function App() {
         onChangeTab={setActiveTab}
         activeAccount={activeAccount}
       />
+
+      {/* Live Firestore Connection Status Header Banner */}
+      <div className="bg-[#070d1a] border-b border-slate-800/80 px-4 py-2">
+        <div className="max-w-7xl mx-auto flex items-center justify-between text-xs font-mono">
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400">Database Firestore:</span>
+            {liveStatus === 'LIVE' && (
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold flex items-center gap-1.5 shadow-sm">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>LIVE (Terhubung & Synchronized)</span>
+              </span>
+            )}
+            {liveStatus === 'CONNECTING' && (
+              <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-spin"></span>
+                <span>CONNECTING (Menghubungkan Database)</span>
+              </span>
+            )}
+            {liveStatus === 'SYNCING' && (
+              <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40 font-bold flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-blue-400 animate-bounce"></span>
+                <span>SYNCING (Sedang Menyimpan Perubahan)</span>
+              </span>
+            )}
+            {liveStatus === 'OFFLINE' && (
+              <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-rose-400"></span>
+                <span>OFFLINE (Koneksi Terputus)</span>
+              </span>
+            )}
+          </div>
+
+          <div className="hidden sm:flex items-center gap-3 text-slate-400">
+            <span>Project ID: <strong className="text-amber-300">gen-lang-client-0520026727</strong></span>
+            <span>•</span>
+            <span>Auth: <strong className="text-emerald-300">{activeAccount?.email || 'Connected'}</strong></span>
+          </div>
+        </div>
+      </div>
 
       {/* Main Dashboard Workspace */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3.5 sm:px-6 lg:px-8 py-5 sm:py-6 pb-28 space-y-6 sm:space-y-8">
@@ -934,12 +987,14 @@ export default function App() {
           <SettingsView
             accounts={accounts}
             activeAccount={activeAccount}
+            auditLogs={auditLogs}
             onSwitchAccount={handleSwitchAccount}
             onSaveAccount={handleSaveAccount}
             onToggleStatus={handleToggleStatus}
             onDeleteAccount={handleDeleteAccount}
             onGoogleLogin={handleGoogleLogin}
             onResetData={handleReset}
+            onApproveUser={handleApproveUser}
           />
         ) : (
           /* TAB 2: BERANDA (Dashboard Operasional Daily Reporting) */
@@ -963,7 +1018,7 @@ export default function App() {
                     </h2>
                     <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5 shadow-sm">
                       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                      <span>LIVE REALTIME SYNC</span>
+                      <span>FIRESTORE REALTIME SYNC</span>
                     </span>
                   </div>
                   <p className="text-xs text-slate-400 mt-0.5">
@@ -971,113 +1026,113 @@ export default function App() {
                   </p>
                 </div>
 
-            {isAdmin && (
-              <button
-                onClick={handleOpenAddTeam}
-                className="self-start sm:self-auto px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-extrabold flex items-center gap-1.5 transition-all shadow-lg shadow-amber-500/10 active:scale-95"
-              >
-                <Plus className="w-4 h-4" />
-                <span>TAMBAH TEAM BARU</span>
-              </button>
-            )}
-          </div>
+                {isAdmin && (
+                  <button
+                    onClick={handleOpenAddTeam}
+                    className="self-start sm:self-auto px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-extrabold flex items-center gap-1.5 transition-all shadow-lg shadow-amber-500/10 active:scale-95 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>TAMBAH TEAM BARU</span>
+                  </button>
+                )}
+              </div>
 
-          {/* Mobile & Tablet Quick Team Filter Tab Bar */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs -mx-1 px-1">
-            <button
-              onClick={() => setSelectedTeamFilter('ALL')}
-              className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-all border font-semibold flex items-center gap-1.5 shrink-0 ${
-                selectedTeamFilter === 'ALL'
-                  ? 'bg-amber-500 text-slate-950 font-extrabold border-amber-400 shadow-md shadow-amber-500/20'
-                  : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:text-white'
-              }`}
-            >
-              <Users className="w-3.5 h-3.5" />
-              <span>Semua Tim ({reportData.teams.length})</span>
-            </button>
-            {reportData.teams.map((t, idx) => {
-              const isSel = selectedTeamFilter === t.id;
-              return (
+              {/* Mobile & Tablet Quick Team Filter Tab Bar */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs -mx-1 px-1">
                 <button
-                  key={t.id}
-                  onClick={() => setSelectedTeamFilter(t.id)}
-                  className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-all border font-mono shrink-0 flex items-center gap-1.5 ${
-                    isSel
+                  onClick={() => setSelectedTeamFilter('ALL')}
+                  className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-all border font-semibold flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                    selectedTeamFilter === 'ALL'
                       ? 'bg-amber-500 text-slate-950 font-extrabold border-amber-400 shadow-md shadow-amber-500/20'
                       : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:text-white'
                   }`}
                 >
-                  <span className="font-bold text-amber-300">T{t.teamNumber || idx + 1}:</span>
-                  <span className="font-sans font-semibold">{t.name}</span>
+                  <Users className="w-3.5 h-3.5" />
+                  <span>Semua Tim ({reportData.teams.length})</span>
                 </button>
-              );
-            })}
-          </div>
+                {reportData.teams.map((t, idx) => {
+                  const isSel = selectedTeamFilter === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => setSelectedTeamFilter(t.id)}
+                      className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition-all border font-mono shrink-0 flex items-center gap-1.5 cursor-pointer ${
+                        isSel
+                          ? 'bg-amber-500 text-slate-950 font-extrabold border-amber-400 shadow-md shadow-amber-500/20'
+                          : 'bg-slate-900/90 text-slate-400 border-slate-800 hover:text-white'
+                      }`}
+                    >
+                      <span className="font-bold text-amber-300">T{t.teamNumber || idx + 1}:</span>
+                      <span className="font-sans font-semibold">{t.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
 
-          {selectedTeamFilter !== 'ALL' && (
-            <div className="flex items-center justify-between px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-300 font-mono">
-              <span>Menampilkan filter: Tim #{reportData.teams.find(t => t.id === selectedTeamFilter)?.teamNumber}</span>
-              <button
-                onClick={() => setSelectedTeamFilter('ALL')}
-                className="underline font-bold text-white hover:text-amber-200"
-              >
-                Lihat Semua Tim
-              </button>
+              {selectedTeamFilter !== 'ALL' && (
+                <div className="flex items-center justify-between px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-300 font-mono">
+                  <span>Menampilkan filter: Tim #{reportData.teams.find(t => t.id === selectedTeamFilter)?.teamNumber}</span>
+                  <button
+                    onClick={() => setSelectedTeamFilter('ALL')}
+                    className="underline font-bold text-white hover:text-amber-200 cursor-pointer"
+                  >
+                    Lihat Semua Tim
+                  </button>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                {(selectedTeamFilter === 'ALL'
+                  ? reportData.teams
+                  : reportData.teams.filter((t) => t.id === selectedTeamFilter)
+                ).map((team) => (
+                  <TeamCard
+                    key={team.id}
+                    team={team}
+                    isAdmin={isAdmin}
+                    onEditTeam={handleOpenEditTeam}
+                    onDeleteTeam={handleDeleteTeam}
+                    onAddSitePackage={handleOpenAddSitePackage}
+                    onEditPackage={handleOpenEditPackage}
+                    onDeletePackage={handleDeletePackage}
+                    onStatusChange={handleStatusChange}
+                    onClosedPackage={handleClosedPackage}
+                    onDeleteClosedPackage={handleDeleteClosedPackage}
+                    onReopenPackage={handleReopenPackage}
+                    onUpdateNote={handleUpdatePackageNote}
+                  />
+                ))}
+              </div>
             </div>
-          )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-            {(selectedTeamFilter === 'ALL'
-              ? reportData.teams
-              : reportData.teams.filter((t) => t.id === selectedTeamFilter)
-            ).map((team) => (
-              <TeamCard
-                key={team.id}
-                team={team}
+            {/* Section 3 & 4: PM Genset Fix & Report Notes */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
+              <GensetFixSection
+                sites={reportData.gensetFixSites}
                 isAdmin={isAdmin}
-                onEditTeam={handleOpenEditTeam}
-                onDeleteTeam={handleDeleteTeam}
-                onAddSitePackage={handleOpenAddSitePackage}
-                onEditPackage={handleOpenEditPackage}
-                onDeletePackage={handleDeletePackage}
-                onStatusChange={handleStatusChange}
-                onClosedPackage={handleClosedPackage}
-                onDeleteClosedPackage={handleDeleteClosedPackage}
-                onReopenPackage={handleReopenPackage}
-                onUpdateNote={handleUpdatePackageNote}
+                onAddSite={handleAddGensetSite}
+                onEditSite={handleEditGensetSite}
+                onDeleteSite={handleDeleteGensetSite}
               />
-            ))}
-          </div>
-        </div>
 
-        {/* Section 3 & 4: PM Genset Fix & Report Notes */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
-          <GensetFixSection
-            sites={reportData.gensetFixSites}
-            isAdmin={isAdmin}
-            onAddSite={handleAddGensetSite}
-            onEditSite={handleEditGensetSite}
-            onDeleteSite={handleDeleteGensetSite}
-          />
+              <ReportNotesSection
+                note={reportData.note}
+                isAdmin={isAdmin}
+                onSaveNote={handleSaveNote}
+              />
+            </div>
+          </>
+        )}
 
-          <ReportNotesSection
-            note={reportData.note}
-            isAdmin={isAdmin}
-            onSaveNote={handleSaveNote}
-          />
-        </div>
-      </>
-    )}
-
-  </main>
+      </main>
 
       {/* Desktop Bottom Credits */}
       <footer className="bg-[#070b16] border-t border-slate-800/80 py-5 pb-24 sm:pb-6 mt-8 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3 font-mono">
           <div className="flex items-center gap-2">
-            <span className="font-bold text-amber-400/90">DAILY REPORTING DEPOTEL</span>
+            <span className="font-bold text-amber-400/90">DAILY REPORTING DEPOTEL ONLINE</span>
             <span>•</span>
-            <span>Sistem Operasional Real-time</span>
+            <span>Firebase Firestore Real-time</span>
           </div>
           <div className="flex items-center gap-2">
             {activeAccount && (

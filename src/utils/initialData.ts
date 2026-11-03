@@ -40,9 +40,9 @@ export function getInitialReportData(): DailyReportData {
         name: 'SAMIN',
         phone: '082374227775',
         sites: [
-          { id: 's1-1', text: '100%', status: 'UNCHECKED' },
-          { id: 's1-2', text: 'Tower space', status: 'UNCHECKED' },
-          { id: 's1-3', text: 'EAS', status: 'UNCHECKED' },
+          { id: 's1-1', text: 'JKT333_GANGBAING', status: 'DONE' },
+          { id: 's1-2', text: 'Tower Space', status: 'DONE' },
+          { id: 's1-3', text: 'EAS', status: 'NOK' },
         ],
       },
       {
@@ -53,7 +53,7 @@ export function getInitialReportData(): DailyReportData {
         sites: [
           { id: 's2-1', text: 'JKT533_MSCBUARAN', status: 'DONE' },
           { id: 's2-2', text: 'Tower Space', status: 'DONE' },
-          { id: 's2-3', text: 'EAS OK', status: 'DONE' },
+          { id: 's2-3', text: 'EAS', status: 'DONE' },
         ],
       },
       {
@@ -62,9 +62,9 @@ export function getInitialReportData(): DailyReportData {
         name: 'RANDI AFDIANSYAH',
         phone: '08131423533',
         sites: [
-          { id: 's3-1', text: '100%', status: 'UNCHECKED' },
-          { id: 's3-2', text: 'Tower Space', status: 'UNCHECKED' },
-          { id: 's3-3', text: 'EAS', status: 'UNCHECKED' },
+          { id: 's3-1', text: 'JKT203_JLINPRES', status: 'DONE' },
+          { id: 's3-2', text: 'Tower Space', status: 'DONE' },
+          { id: 's3-3', text: 'EAS', status: 'DONE' },
         ],
       },
       {
@@ -74,8 +74,8 @@ export function getInitialReportData(): DailyReportData {
         phone: '08119234974',
         sites: [
           { id: 's4-1', text: 'JKS048_PENGADEGAN', status: 'DONE' },
-          { id: 's4-2', text: 'Tower space', status: 'NOK' },
-          { id: 's4-3', text: 'CEK EAS NOK', status: 'NOK' },
+          { id: 's4-2', text: 'Tower Space', status: 'NOK' },
+          { id: 's4-3', text: 'EAS', status: 'NOK' },
         ],
       },
       {
@@ -85,8 +85,8 @@ export function getInitialReportData(): DailyReportData {
         phone: '081319012052',
         sites: [
           { id: 's5-1', text: 'JKS016 TSELSIMATUPANG', status: 'DONE' },
-          { id: 's5-2', text: 'Tower space', status: 'NOK' },
-          { id: 's5-3', text: 'CEK EAS NOK', status: 'UNCHECKED' },
+          { id: 's5-2', text: 'Tower Space', status: 'NOK' },
+          { id: 's5-3', text: 'EAS', status: 'DONE' },
         ],
       },
       {
@@ -96,13 +96,13 @@ export function getInitialReportData(): DailyReportData {
         phone: '081286241842',
         sites: [
           { id: 's6-1', text: 'EPE103_LUBANGBUAYAEASYMACRO', status: 'DONE' },
-          { id: 's6-2', text: 'Tower space', status: 'UNCHECKED' },
-          { id: 's6-3', text: 'Check N/A', status: 'NA' },
+          { id: 's6-2', text: 'Tower Space', status: 'DONE' },
+          { id: 's6-3', text: 'EAS', status: 'DONE' },
         ],
       },
     ],
     gensetFixSites: [],
-    note: '',
+    note: 'Terimakasih.',
     updatedAt: new Date().toISOString(),
   };
 }

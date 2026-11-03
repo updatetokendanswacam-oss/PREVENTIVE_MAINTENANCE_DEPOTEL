@@ -1,0 +1,84 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User profile with role, approval status, and optional team assignment.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["ROLE_ADMIN", "ROLE_USER"] },
+        "status": { "type": "string", "enum": ["AKTIF", "NONAKTIF"] },
+        "approved": { "type": "boolean" },
+        "assignedTeamId": { "type": "string" },
+        "isGoogleConnected": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "lastLoginAt": { "type": "string" }
+      },
+      "required": ["uid", "name", "email", "role", "status", "approved"]
+    },
+    "DailyReport": {
+      "title": "Daily Report",
+      "description": "Comprehensive daily reporting document for DEPOTEL PM operations.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "dateInfo": { "type": "object" },
+        "categories": { "type": "array" },
+        "teams": { "type": "array" },
+        "gensetFixSites": { "type": "array" },
+        "note": { "type": "string" },
+        "customWhatsAppReport": { "type": "string" },
+        "isCustomWhatsAppEdited": { "type": "boolean" },
+        "updatedAt": { "type": "string" },
+        "lastUpdatedBy": { "type": "string" }
+      },
+      "required": ["id", "dateInfo", "categories", "teams", "updatedAt"]
+    },
+    "AuditLog": {
+      "title": "Audit Log",
+      "description": "Activity log recording all user and admin modifications.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userName": { "type": "string" },
+        "userRole": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "userEmail", "action", "timestamp"]
+    },
+    "Admin": {
+      "title": "Admin Reference",
+      "description": "Lookup document for bootstrapped admin users.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "email"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents"
+    },
+    "/dailyReports/{reportId}": {
+      "schema": "DailyReport",
+      "description": "Daily report documents per date"
+    },
+    "/auditLogs/{logId}": {
+      "schema": "AuditLog",
+      "description": "Audit activity logs"
+    },
+    "/admins/{userId}": {
+      "schema": "Admin",
+      "description": "Admin authorization reference collection"
+    }
+  }
+}

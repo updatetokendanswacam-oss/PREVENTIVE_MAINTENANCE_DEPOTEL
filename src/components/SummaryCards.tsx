@@ -1,5 +1,5 @@
 import React from 'react';
-import { Target, CheckCircle, Clock, AlertTriangle, Users, Layers, Award } from 'lucide-react';
+import { Target, CheckCircle, Clock, AlertTriangle, Users, Layers, Award, Pencil, CheckCircle2, XCircle } from 'lucide-react';
 import { JobCategory, TeamData } from '../types/reporting';
 
 interface SummaryCardsProps {
@@ -115,16 +115,22 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({
             <Layers className="w-5 h-5 text-purple-400" />
           </div>
           <div className="space-y-1 text-xs">
-            <div className="flex justify-between font-mono">
-              <span className="text-emerald-400">✅ Done:</span>
+            <div className="flex justify-between items-center font-mono">
+              <span className="text-emerald-400 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" /> Done:
+              </span>
               <span className="font-bold text-white">{doneCount}</span>
             </div>
-            <div className="flex justify-between font-mono">
-              <span className="text-rose-400">❌ NOK:</span>
+            <div className="flex justify-between items-center font-mono">
+              <span className="text-rose-400 flex items-center gap-1">
+                <XCircle className="w-3 h-3" /> NOK:
+              </span>
               <span className="font-bold text-white">{nokCount}</span>
             </div>
-            <div className="flex justify-between font-mono">
-              <span className="text-amber-400">⏳ Progress:</span>
+            <div className="flex justify-between items-center font-mono">
+              <span className="text-amber-400 flex items-center gap-1">
+                <Clock className="w-3 h-3" /> Progress:
+              </span>
               <span className="font-bold text-white">{progressCount}</span>
             </div>
           </div>
@@ -139,7 +145,11 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({
             <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
             DATA LAPORAN UTAMA
           </h2>
-          <span className="text-xs text-slate-400">Tekan ikon edit (✎) untuk mengubah target</span>
+          <span className="text-xs text-slate-400 flex items-center gap-1">
+            <span>Tekan ikon edit</span>
+            <Pencil className="w-3 h-3 text-amber-400 inline" />
+            <span>untuk mengubah target</span>
+          </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -167,7 +177,7 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({
                       className="p-2 rounded-xl bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-amber-400 transition-all shadow"
                       title={`Edit ${cat.title}`}
                     >
-                      ✎
+                      <Pencil className="w-4 h-4" />
                     </button>
                   )}
                 </div>

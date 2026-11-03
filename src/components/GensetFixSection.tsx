@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Wrench, Plus, Trash2, Edit2 } from 'lucide-react';
+import { Wrench, Plus, Trash2, Edit2, CheckCircle2, XCircle, Clock, MinusCircle, Circle } from 'lucide-react';
 import { GensetFixSite, SiteStatus } from '../types/reporting';
 
 interface GensetFixSectionProps {
@@ -22,12 +22,12 @@ export const GensetFixSection: React.FC<GensetFixSectionProps> = ({
   const [siteNameInput, setSiteNameInput] = useState('');
   const [statusInput, setStatusInput] = useState<SiteStatus>('UNCHECKED');
 
-  const statusOptions: { value: SiteStatus; label: string; icon: string; badgeClass: string }[] = [
-    { value: 'DONE', label: 'SELESAI', icon: '✅', badgeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' },
-    { value: 'NOK', label: 'NOK', icon: '❌', badgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/40' },
-    { value: 'PROGRESS', label: 'PROGRESS', icon: '⏳', badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
-    { value: 'NA', label: 'N/A', icon: 'N/A', badgeClass: 'bg-slate-700/50 text-slate-300 border-slate-600' },
-    { value: 'UNCHECKED', label: 'BELUM', icon: '⚪', badgeClass: 'bg-blue-950/40 text-blue-300 border-blue-800/50' },
+  const statusOptions: { value: SiteStatus; label: string; icon: React.ReactNode; badgeClass: string }[] = [
+    { value: 'DONE', label: 'SELESAI', icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 inline mr-1" />, badgeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' },
+    { value: 'NOK', label: 'NOK', icon: <XCircle className="w-3.5 h-3.5 text-rose-400 inline mr-1" />, badgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/40' },
+    { value: 'PROGRESS', label: 'PROGRESS', icon: <Clock className="w-3.5 h-3.5 text-amber-400 inline mr-1" />, badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
+    { value: 'NA', label: 'N/A', icon: <MinusCircle className="w-3.5 h-3.5 text-slate-400 inline mr-1" />, badgeClass: 'bg-slate-700/50 text-slate-300 border-slate-600' },
+    { value: 'UNCHECKED', label: 'BELUM', icon: <Circle className="w-3.5 h-3.5 text-blue-400 inline mr-1" />, badgeClass: 'bg-blue-950/40 text-blue-300 border-blue-800/50' },
   ];
 
   const handleStartAdd = () => {

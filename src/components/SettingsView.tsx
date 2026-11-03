@@ -11,7 +11,6 @@ import {
   LogIn,
   KeyRound,
   Sparkles,
-  ArrowRight,
   Shield,
   User,
   Smartphone,
@@ -22,33 +21,38 @@ import {
   Globe,
   CloudUpload,
   Zap,
-  Database,
   Copy,
-  ExternalLink,
   Check,
+  Activity,
+  UserPlus,
+  Users,
 } from 'lucide-react';
-import { AppAccount, UserRole, AccountStatus } from '../types/reporting';
+import { AppAccount, UserRole, AccountStatus, AuditLog } from '../types/reporting';
 
 interface SettingsViewProps {
   accounts: AppAccount[];
   activeAccount: AppAccount | null;
+  auditLogs?: AuditLog[];
   onSwitchAccount: (id: string) => void;
   onSaveAccount: (account: Partial<AppAccount>) => Promise<void>;
   onToggleStatus: (id: string) => Promise<void>;
   onDeleteAccount: (id: string) => Promise<void>;
   onGoogleLogin: (email: string, name?: string) => Promise<void>;
   onResetData: () => Promise<void>;
+  onApproveUser?: (id: string, approved: boolean, assignedTeamId?: string) => Promise<void>;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
   accounts,
   activeAccount,
+  auditLogs = [],
   onSwitchAccount,
   onSaveAccount,
   onToggleStatus,
   onDeleteAccount,
   onGoogleLogin,
   onResetData,
+  onApproveUser,
 }) => {
   // New account form state
   const [showAddForm, setShowAddForm] = useState(false);
@@ -56,6 +60,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [newEmail, setNewEmail] = useState('');
   const [newRole, setNewRole] = useState<UserRole>('ROLE_USER');
   const [newStatus, setNewStatus] = useState<AccountStatus>('AKTIF');
+  const [newAssignedTeam, setNewAssignedTeam] = useState<string>('ALL');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Quick Google Connect input state
@@ -67,7 +72,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
-  const [accountRoleFilter, setAccountRoleFilter] = useState<'ALL' | 'ADMIN' | 'USER'>('ALL');
+  const [accountRoleFilter, setAccountRoleFilter] = useState<'ALL' | 'ADMIN' | 'USER' | 'PENDING'>('ALL');
 
   // GitHub & Vercel Sync State
   const [githubRepo, setGithubRepo] = useState(() => {
@@ -88,6 +93,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncSuccessMsg, setSyncSuccessMsg] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+
+  const teamOptions = [
+    { id: 'ALL', label: 'Semua Tim (Akses Penuh / Admin)' },
+    { id: 'team-1', label: 'Team 1 - SAMIN (082374227775)' },
+    { id: 'team-2', label: 'Team 2 - MUHAMAD JUNAEDI (08119234976)' },
+    { id: 'team-3', label: 'Team 3 - RANDI AFDIANSYAH (08131423533)' },
+    { id: 'team-4', label: 'Team 4 - KOSASIH (08119234974)' },
+    { id: 'team-5', label: 'Team 5 - ROMI HENDRA GUNAWAN (081319012052)' },
+    { id: 'team-6', label: 'Team 6 - ROY ISHARRYANTO (081286241842)' },
+  ];
 
   const handleSaveGithubVercelConfig = (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,12 +156,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       email: newEmail.trim().toLowerCase(),
       role: newRole,
       status: newStatus,
+      approved: true, // Accounts added by Admin are auto-approved
+      assignedTeamId: newAssignedTeam,
       isGoogleConnected: true,
     });
     setNewName('');
     setNewEmail('');
     setNewRole('ROLE_USER');
     setNewStatus('AKTIF');
+    setNewAssignedTeam('ALL');
     setShowAddForm(false);
     setIsSubmitting(false);
   };
@@ -214,7 +232,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[11px] font-mono text-slate-400 uppercase font-semibold">
-                  {isAdmin ? 'NAMA ADMIN' : 'NAMA USER'}
+                  {isAdmin ? 'NAMA ADMIN' : 'NAMA USER / TEKNISI'}
                 </span>
 
                 {/* ROLE BADGE */}
@@ -258,11 +276,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <div>
               <p className="text-[11px] text-slate-400">Hak Akses Sistem</p>
               <p className="text-xs font-bold text-amber-400 font-mono mt-0.5">
-                {isAdmin ? 'ADMIN: AKSES PENUH (FULL ACCESS)' : 'USER: AKSES OPERASIONAL (CHECKLIST & LAPORAN)'}
+                {isAdmin ? 'ADMIN: AKSES PENUH (FULL ACCESS)' : 'USER: AKSES TEKNISI TIM (CHECKLIST & LAPORAN)'}
               </p>
             </div>
             <p className="text-[10px] text-slate-500 font-mono mt-1">
-              DEPOTEL Real-time Session
+              DEPOTEL Real-time Firestore Session
             </p>
           </div>
         </div>
@@ -300,15 +318,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                 />
               </svg>
-              <span>MASUK DENGAN GMAIL / GOOGLE</span>
+              <span>MASUK DENGAN GMAIL / GOOGLE FIREBASE</span>
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              Hubungkan akun Gmail/Google pribadi di HP masing-masing agar otomatis terkoneksi ke WebApp
+              Hubungkan akun Gmail/Google pribadi di HP masing-masing agar otomatis terkoneksi ke Firestore WebApp
             </p>
           </div>
 
           <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-            AUTO-SYNC
+            FIREBASE AUTH
           </span>
         </div>
 
@@ -381,13 +399,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-[11px] font-semibold text-slate-400 block mb-1">
-                    Nama Anda (User / Admin)
+                    Nama Anda (Teknisi / Admin)
                   </label>
                   <input
                     type="text"
                     value={customGoogleName}
                     onChange={(e) => setCustomGoogleName(e.target.value)}
-                    placeholder="Contoh: BUDI SANTOSO"
+                    placeholder="Contoh: SAMIN (TEAM 1)"
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
                   />
                 </div>
@@ -421,16 +439,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
 
-      {/* 3. DAFTAR AKUN USER & ADMIN (KELOLA AKUN & HAK AKSES) */}
+      {/* 3. DAFTAR AKUN USER & ADMIN (KELOLA AKUN & HAK AKSES PER TIM) */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
           <div>
             <h3 className="text-base font-bold text-white flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-amber-400" />
-              <span>DAFTAR AKUN USER & ADMIN</span>
+              <span>DAFTAR AKUN USER & ADMIN & HAK AKSES TIM</span>
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              Daftar akun terdaftar. Atur hak akses ROLE ADMIN / ROLE USER, serta kelola status AKTIF / NONAKTIF (Akses aman per user & login Google HP)
+              Daftar akun terdaftar. Atur persetujuan Admin, penugasan Tim Teknisi (Team 1-6), serta hak akses Admin & User
             </p>
           </div>
 
@@ -456,21 +474,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 + FORM TAMBAH AKUN USER / ADMIN BARU
               </h4>
               <span className="text-[11px] text-slate-400 font-mono">
-                Langsung Aktif & Terkoneksi
+                Langsung Terkoneksi ke Firestore
               </span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-xs font-bold text-slate-300 block mb-1.5">
-                  NAMA USER / ADMIN *
+                  NAMA TEKNISI / ADMIN *
                 </label>
                 <input
                   type="text"
                   required
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  placeholder="Contoh: KOSASIH (TEAM 4)"
+                  placeholder="Contoh: SAMIN (TEAM 1)"
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
                 />
               </div>
@@ -484,7 +502,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   required
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
-                  placeholder="email.petugas@gmail.com"
+                  placeholder="samin.depotel@gmail.com"
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono"
                 />
               </div>
@@ -523,38 +541,22 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </div>
               </div>
 
-              {/* STATUS SELECTION */}
+              {/* TEAM ASSIGNMENT SELECTION */}
               <div>
                 <label className="text-xs font-bold text-slate-300 block mb-1.5">
-                  STATUS AKUN *
+                  PENUGASAN TIM LAPANGAN (TEKNISI) *
                 </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setNewStatus('AKTIF')}
-                    className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
-                      newStatus === 'AKTIF'
-                        ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 shadow'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
-                    }`}
-                  >
-                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                    <span>AKTIF</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setNewStatus('NONAKTIF')}
-                    className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
-                      newStatus === 'NONAKTIF'
-                        ? 'bg-rose-500/20 border-rose-400 text-rose-300 shadow'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
-                    }`}
-                  >
-                    <span className="w-2 h-2 rounded-full bg-rose-400" />
-                    <span>NONAKTIF</span>
-                  </button>
-                </div>
+                <select
+                  value={newAssignedTeam}
+                  onChange={(e) => setNewAssignedTeam(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-amber-400 cursor-pointer"
+                >
+                  {teamOptions.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -572,7 +574,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer disabled:opacity-50"
               >
                 <CheckCircle2 className="w-4 h-4" />
-                <span>Simpan & Aktifkan Langsung</span>
+                <span>Simpan & Disetujui Langsung</span>
               </button>
             </div>
           </form>
@@ -582,11 +584,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         {(() => {
           const adminAccounts = accounts.filter((a) => a.role === 'ROLE_ADMIN');
           const userAccounts = accounts.filter((a) => a.role === 'ROLE_USER');
+          const pendingAccounts = accounts.filter((a) => a.approved === false);
 
           const renderAccountCard = (acc: AppAccount) => {
             const isCurrent = activeAccount?.id === acc.id;
             const accIsAdmin = acc.role === 'ROLE_ADMIN';
             const accIsAktif = acc.status === 'AKTIF';
+            const isApproved = acc.approved !== false;
 
             return (
               <div
@@ -631,6 +635,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         <span>{acc.status}</span>
                       </span>
 
+                      {/* APPROVAL BADGE */}
+                      <span
+                        className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border ${
+                          isApproved
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                            : 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse'
+                        }`}
+                      >
+                        {isApproved ? '✓ Disetujui Admin' : '⏳ Menunggu Persetujuan'}
+                      </span>
+
                       {isCurrent && (
                         <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-400 text-slate-950">
                           SEDANG DIGUNAKAN
@@ -638,11 +653,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2 text-xs text-slate-400 font-mono mt-0.5">
-                      <Mail className="w-3 h-3 text-slate-500" />
-                      <span>{acc.email}</span>
-                      {acc.isGoogleConnected && (
-                        <span className="text-[10px] text-emerald-400">✓ Google</span>
+                    <div className="flex items-center gap-2 text-xs text-slate-400 font-mono mt-0.5 flex-wrap">
+                      <div className="flex items-center gap-1">
+                        <Mail className="w-3 h-3 text-slate-500" />
+                        <span>{acc.email}</span>
+                      </div>
+                      {acc.assignedTeamId && acc.assignedTeamId !== 'ALL' && (
+                        <span className="text-[10px] text-amber-300 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20 font-bold">
+                          📌 Assigned: {teamOptions.find(t => t.id === acc.assignedTeamId)?.label.split(' - ')[0] || acc.assignedTeamId}
+                        </span>
                       )}
                     </div>
                   </div>
@@ -651,6 +670,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 {/* Account Actions */}
                 <div className="flex items-center gap-2 self-end sm:self-center flex-wrap">
                   
+                  {/* Approve / Reject Toggle */}
+                  {isAdmin && onApproveUser && (
+                    <button
+                      type="button"
+                      onClick={() => onApproveUser(acc.id, !isApproved, acc.assignedTeamId)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1 cursor-pointer ${
+                        isApproved
+                          ? 'bg-slate-900 hover:bg-amber-950/60 text-slate-300 border-slate-700'
+                          : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400 border-emerald-400 shadow-md font-black'
+                      }`}
+                      title={isApproved ? 'Klik untuk membatalkan persetujuan' : 'Klik untuk menyetujui akun'}
+                    >
+                      {isApproved ? <UserX className="w-3.5 h-3.5 text-amber-400" /> : <UserCheck className="w-3.5 h-3.5" />}
+                      <span>{isApproved ? 'Batal Setuju' : 'Setujui Akun'}</span>
+                    </button>
+                  )}
+
                   {/* Status Toggle Button (AKTIF <-> NONAKTIF) */}
                   {isAdmin && (
                     <button
@@ -684,7 +720,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     </button>
                   )}
 
-                  {/* Delete Account Button & Inline Confirmation */}
+                  {/* Delete Account Button */}
                   {acc.id === 'acc-admin-main' || acc.email.toLowerCase() === 'updatetokendanswacam@gmail.com' ? (
                     <span
                       className="p-2 rounded-xl bg-slate-900/80 border border-amber-500/30 text-amber-400 flex items-center justify-center cursor-not-allowed shrink-0"
@@ -786,8 +822,22 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   }`}
                 >
                   <User className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Daftar Akun User ({userAccounts.length})</span>
+                  <span>Daftar Akun User / Teknisi ({userAccounts.length})</span>
                 </button>
+                {pendingAccounts.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setAccountRoleFilter('PENDING')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer animate-pulse ${
+                      accountRoleFilter === 'PENDING'
+                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/50 shadow-md'
+                        : 'bg-slate-950 text-rose-400 hover:text-white border border-slate-800'
+                    }`}
+                  >
+                    <UserPlus className="w-3.5 h-3.5 text-rose-400" />
+                    <span>Perlu Persetujuan ({pendingAccounts.length})</span>
+                  </button>
+                )}
               </div>
 
               {/* Categorized List Render */}
@@ -816,7 +866,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   <div className="space-y-2 pt-2">
                     <div className="flex items-center gap-2 text-xs font-bold text-blue-300 font-mono tracking-wide px-1">
                       <User className="w-4 h-4 text-blue-400" />
-                      <span>DAFTAR AKUN USER (ROLE_USER) - {userAccounts.length} AKUN</span>
+                      <span>DAFTAR AKUN USER / TEKNISI (ROLE_USER) - {userAccounts.length} AKUN</span>
                     </div>
                     {userAccounts.length === 0 ? (
                       <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-500 font-mono">
@@ -835,7 +885,53 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         })()}
       </div>
 
-      {/* 4. INTEGRASI GITHUB & VERCEL REALTIME (AUTO-SYNC DATABASE) */}
+      {/* 4. FIRESTORE AUDIT ACTIVITY LOGS */}
+      {isAdmin && (
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+            <div className="flex items-center gap-2">
+              <Activity className="w-5 h-5 text-amber-400" />
+              <h3 className="text-base font-extrabold text-white tracking-tight">
+                RIWAYAT AKTIVITAS & PERUBAHAN (FIRESTORE AUDIT LOG)
+              </h3>
+            </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">
+              REALTIME AUDIT
+            </span>
+          </div>
+
+          <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+            {auditLogs.length === 0 ? (
+              <div className="p-4 text-center text-xs text-slate-500 font-mono bg-slate-950/60 rounded-xl border border-slate-800">
+                Belum ada catatan aktivitas baru di Firestore.
+              </div>
+            ) : (
+              auditLogs.map((log) => (
+                <div
+                  key={log.id}
+                  className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex items-start justify-between gap-3 text-xs font-mono"
+                >
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-amber-300">{log.userName || log.userEmail}</span>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300">
+                        {log.userRole || 'USER'}
+                      </span>
+                      <span className="text-emerald-400 font-bold">{log.action}</span>
+                    </div>
+                    <p className="text-slate-300 text-[11px]">{log.details}</p>
+                  </div>
+                  <span className="text-[10px] text-slate-500 shrink-0">
+                    {new Date(log.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 5. INTEGRASI GITHUB & VERCEL REALTIME (AUTO-SYNC DATABASE) */}
       <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/60 border border-indigo-500/30 rounded-2xl p-5 sm:p-6 shadow-2xl space-y-5 relative overflow-hidden">
         <div className="absolute top-0 right-0 -mr-16 -mt-16 w-56 h-56 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -848,7 +944,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </h3>
             </div>
             <p className="text-xs text-slate-300 mt-1">
-              Sambungkan data & database Google AI Studio ke GitHub Repository dan Vercel secara otomatis. Vercel mengambil update data terbaru secara Realtime.
+              Sambungkan data & database Google AI Studio ke GitHub Repository dan Vercel secara otomatis.
             </p>
           </div>
 
@@ -863,7 +959,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         {/* Sync Pipeline Flow Diagram */}
         <div className="p-4 rounded-xl bg-slate-950/90 border border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
           
-          {/* Node 1: Google AI Studio */}
           <div className="p-3 rounded-lg bg-slate-900/90 border border-amber-500/40 flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center flex-shrink-0">
               <Sparkles className="w-5 h-5 text-amber-300" />
@@ -871,13 +966,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <div>
               <div className="flex items-center gap-1.5 font-bold text-amber-300 font-mono">
                 <span>GOOGLE AI STUDIO</span>
-                <span className="text-[9px] bg-amber-500/20 px-1 rounded text-amber-200">SOURCE DB</span>
+                <span className="text-[9px] bg-amber-500/20 px-1 rounded text-amber-200">FIRESTORE</span>
               </div>
-              <p className="text-[11px] text-slate-400 mt-0.5 font-mono">Real-time DB & Applet State</p>
+              <p className="text-[11px] text-slate-400 mt-0.5 font-mono">Real-time DB & Auth State</p>
             </div>
           </div>
 
-          {/* Node 2: GitHub Repository */}
           <div className="p-3 rounded-lg bg-slate-900/90 border border-indigo-500/40 flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/40 flex items-center justify-center flex-shrink-0">
               <GitBranch className="w-5 h-5 text-indigo-300" />
@@ -893,7 +987,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </div>
 
-          {/* Node 3: Vercel Deployment */}
           <div className="p-3 rounded-lg bg-slate-900/90 border border-emerald-500/40 flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center flex-shrink-0">
               <Globe className="w-5 h-5 text-emerald-300" />
@@ -921,7 +1014,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <form onSubmit={handleSaveGithubVercelConfig} className="space-y-4 pt-1">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             
-            {/* GitHub Repo URL */}
             <div>
               <label className="text-xs font-bold text-slate-300 block mb-1 flex items-center gap-1.5">
                 <GitBranch className="w-3.5 h-3.5 text-indigo-400" />
@@ -937,7 +1029,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               />
             </div>
 
-            {/* Target Branch */}
             <div>
               <label className="text-xs font-bold text-slate-300 block mb-1 flex items-center gap-1.5">
                 <GitBranch className="w-3.5 h-3.5 text-amber-400" />
@@ -953,7 +1044,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               />
             </div>
 
-            {/* GitHub Personal Access Token (PAT) */}
             <div>
               <label className="text-xs font-bold text-slate-300 block mb-1 flex items-center gap-1.5">
                 <Lock className="w-3.5 h-3.5 text-emerald-400" />
@@ -969,7 +1059,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               />
             </div>
 
-            {/* Vercel Deploy Hook URL */}
             <div>
               <label className="text-xs font-bold text-slate-300 block mb-1 flex items-center gap-1.5">
                 <Globe className="w-3.5 h-3.5 text-emerald-400" />
@@ -998,7 +1087,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
           </div>
 
-          {/* Checkbox for Auto-Sync */}
           <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-950/60 border border-slate-800">
             <div className="flex items-center gap-2.5">
               <input
@@ -1015,9 +1103,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <Zap className={`w-4 h-4 ${autoSyncEnabled ? 'text-amber-400 animate-bounce' : 'text-slate-600'}`} />
           </div>
 
-          {/* Form Submit & Action Buttons */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2.5 pt-2">
-            
             <button
               type="button"
               onClick={handleManualSyncNow}
@@ -1036,85 +1122,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               {isSyncing ? <RefreshCw className="w-4 h-4 animate-spin text-white" /> : <CheckCircle2 className="w-4 h-4" />}
               <span>Simpan Pengaturan Sync GitHub & Vercel</span>
             </button>
-
           </div>
         </form>
 
       </div>
 
-      {/* 5. PANDUAN IJIN HAK AKSES SISTEM (ROLE MATRIX) */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
-        <h3 className="text-base font-bold text-white flex items-center gap-2">
-          <KeyRound className="w-5 h-5 text-amber-400" />
-          <span>MATRIKS HAK AKSES (ROLE PERMISSIONS)</span>
-        </h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-          
-          {/* ROLE ADMIN BOX */}
-          <div className="p-4 rounded-xl bg-slate-950/80 border border-amber-500/30 space-y-2.5">
-            <div className="flex items-center gap-2 pb-2 border-b border-slate-800">
-              <Shield className="w-4 h-4 text-amber-400" />
-              <span className="font-extrabold text-amber-300 font-mono">ROLE ADMIN (Akses Penuh)</span>
-            </div>
-            <ul className="space-y-1.5 text-slate-300 font-mono">
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Edit Target & Pencapaian Utama (NOP, Genset, Tower)</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Tambah, Edit, & Hapus Team Lapangan</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Tambah, Edit, Hapus & Closed Paket Site Tim</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Kelola Akun Pengguna (Role Admin & User, Aktif/Nonaktif)</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Ubah Tanggal Laporan & Reset Data</span>
-              </li>
-            </ul>
-          </div>
-
-          {/* ROLE USER BOX */}
-          <div className="p-4 rounded-xl bg-slate-950/80 border border-blue-500/30 space-y-2.5">
-            <div className="flex items-center gap-2 pb-2 border-b border-slate-800">
-              <User className="w-4 h-4 text-blue-400" />
-              <span className="font-extrabold text-blue-300 font-mono">ROLE USER (Akses Lapangan)</span>
-            </div>
-            <ul className="space-y-1.5 text-slate-300 font-mono">
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Melihat Seluruh Dashboard Laporan Real-time</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Update Status Checklist Site (OK, NOK, PROGRESS, BLM)</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Salin & Kirim Laporan ke WhatsApp Team</span>
-              </li>
-              <li className="flex items-center gap-2 text-slate-500">
-                <XCircle className="w-3.5 h-3.5 text-rose-500" />
-                <span>Tidak dapat mengubah Target Master Laporan</span>
-              </li>
-              <li className="flex items-center gap-2 text-slate-500">
-                <XCircle className="w-3.5 h-3.5 text-rose-500" />
-                <span>Tidak dapat menghapus Team atau mengubah Akun Admin</span>
-              </li>
-            </ul>
-          </div>
-
-        </div>
-      </div>
-
-      {/* 5. RESET / DANGER ZONE (Admin Only) */}
+      {/* 6. RESET / DANGER ZONE (Admin Only) */}
       {isAdmin && (
         <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
           <div>

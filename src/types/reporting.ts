@@ -1,5 +1,7 @@
 export type SiteStatus = 'DONE' | 'NOK' | 'PROGRESS' | 'NA' | 'UNCHECKED';
 
+export type LiveConnectionStatus = 'LIVE' | 'CONNECTING' | 'OFFLINE' | 'SYNCING';
+
 export interface SiteItem {
   id: string;
   packageId?: string;
@@ -11,9 +13,11 @@ export interface SiteItem {
   lat?: number;
   lng?: number;
   note?: string;
+  photoUrl?: string; // Technician documentation photo
   isClosed?: boolean;
   closedAt?: string;
   closedCategoryTitle?: string;
+  lastUpdatedBy?: string;
 }
 
 export interface SitePackage {
@@ -52,6 +56,8 @@ export interface GensetFixSite {
   lat?: number;
   lng?: number;
   note?: string;
+  photoUrl?: string; // Photo documentation
+  technicianName?: string;
 }
 
 export interface ReportDateInfo {
@@ -71,6 +77,7 @@ export interface DailyReportData {
   customWhatsAppReport?: string;
   isCustomWhatsAppEdited?: boolean;
   updatedAt: string;
+  lastUpdatedBy?: string;
 }
 
 export interface ToastMessage {
@@ -84,13 +91,26 @@ export type AccountStatus = 'AKTIF' | 'NONAKTIF';
 
 export interface AppAccount {
   id: string;
+  uid?: string; // Firebase Auth UID
   name: string; // NAMA USER / NAMA ADMIN
   email: string; // GMAIL / GOOGLE
   role: UserRole; // ROLE ADMIN / ROLE USER
   status: AccountStatus; // AKTIF / NONAKTIF
+  approved?: boolean; // Admin approval flag
+  assignedTeamId?: string; // e.g. "team-1", "team-2", "ALL"
   isGoogleConnected: boolean;
   avatarUrl?: string;
   department?: string;
   createdAt: string;
   lastLoginAt: string;
+}
+
+export interface AuditLog {
+  id: string;
+  userEmail: string;
+  userName: string;
+  userRole: string;
+  action: string;
+  details: string;
+  timestamp: string;
 }

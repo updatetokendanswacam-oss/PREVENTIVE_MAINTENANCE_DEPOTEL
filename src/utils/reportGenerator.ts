@@ -86,28 +86,30 @@ export function generateWhatsAppReport(data: DailyReportData): string {
     const packagesToDisplay = [...activePackages, ...closedPackages];
 
     if (packagesToDisplay.length === 0) {
-      lines.push('- Tidak ada site -');
+      lines.push('');
     } else {
-      let itemNumber = 1;
+      let packageIndex = 1;
       packagesToDisplay.forEach((pkg) => {
-        // 1. Site item line
+        // 1. Primary Site item line
         const siteText = pkg.siteItem?.text || pkg.siteItem?.siteName || 'Site';
         const siteStatus = pkg.siteItem?.status || (pkg.isClosed ? 'DONE' : 'PROGRESS');
-        lines.push(`${itemNumber++}. ${formatSiteLine(siteText, siteStatus)}`);
+        lines.push(`${packageIndex++}. ${formatSiteLine(siteText, siteStatus)}`);
 
         // 2. SPACE TOWER item line
-        const towerText = pkg.towerItem?.text || 'Tower space';
+        const towerText = pkg.towerItem?.text || 'Tower Space';
         const towerStatus = pkg.towerItem?.status || (pkg.isClosed ? 'DONE' : 'UNCHECKED');
-        lines.push(`${itemNumber++}. ${formatSiteLine(towerText, towerStatus)}`);
+        lines.push(` • ${formatSiteLine(towerText, towerStatus)}`);
 
-        // 3. CEK EAS item line
+        // 3. EAS item line
         const easText = pkg.easItem?.text || 'EAS';
         const easStatus = pkg.easItem?.status || (pkg.isClosed ? 'DONE' : 'UNCHECKED');
-        lines.push(`${itemNumber++}. ${formatSiteLine(easText, easStatus)}`);
+        lines.push(` • ${formatSiteLine(easText, easStatus)}`);
 
-        // Note under item 3. CEK EAS
-        const pkgNote = pkg.siteItem?.note?.trim() || pkg.note?.trim() || '-';
-        lines.push(`*NOTE :* ${pkgNote}`);
+        // Optional Note under item if present
+        const pkgNote = pkg.siteItem?.note?.trim() || pkg.note?.trim();
+        if (pkgNote) {
+          lines.push(` *NOTE :* ${pkgNote}`);
+        }
       });
     }
 

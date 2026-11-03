@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Check } from 'lucide-react';
+import { FileText, Check, Pencil, Trash2 } from 'lucide-react';
 
 interface ReportNotesSectionProps {
   note: string;
@@ -20,6 +20,14 @@ export const ReportNotesSection: React.FC<ReportNotesSectionProps> = ({
     setIsEditing(true);
   };
 
+  const handleClearNote = () => {
+    if (window.confirm('Hapus/kosongkan catatan laporan ini?')) {
+      onSaveNote('');
+      setNoteInput('');
+      setIsEditing(false);
+    }
+  };
+
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     onSaveNote(noteInput);
@@ -38,14 +46,25 @@ export const ReportNotesSection: React.FC<ReportNotesSectionProps> = ({
         </div>
 
         {!isEditing && (
-          <button
-            onClick={handleStartEdit}
-            className="p-1.5 rounded-xl bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-amber-400 transition-all text-xs font-bold flex items-center gap-1 shadow"
-            title="Edit Catatan Laporan"
-          >
-            <span>✎</span>
-            <span className="hidden sm:inline">Edit Catatan</span>
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleStartEdit}
+              className="p-1.5 rounded-xl bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-amber-400 transition-all text-xs font-bold flex items-center gap-1 shadow cursor-pointer"
+              title="Edit Catatan Laporan"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Edit Catatan</span>
+            </button>
+            {note && note.trim().length > 0 && (
+              <button
+                onClick={handleClearNote}
+                className="p-1.5 rounded-xl bg-slate-800 hover:bg-rose-600 hover:text-white text-slate-400 transition-all text-xs font-bold flex items-center gap-1 shadow cursor-pointer"
+                title="Hapus Catatan Laporan"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         )}
       </div>
 
@@ -80,8 +99,10 @@ export const ReportNotesSection: React.FC<ReportNotesSectionProps> = ({
           {note && note.trim().length > 0 ? (
             note
           ) : (
-            <span className="text-slate-500 italic">
-              Tidak ada catatan tambahan. Klik ikon edit (✎) untuk menambahkan catatan.
+            <span className="text-slate-500 italic flex items-center gap-1">
+              <span>Tidak ada catatan tambahan. Klik ikon edit</span>
+              <Pencil className="w-3 h-3 text-amber-400 inline" />
+              <span>untuk menambahkan catatan.</span>
             </span>
           )}
         </div>

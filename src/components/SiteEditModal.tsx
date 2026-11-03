@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, Building2, Search, Sparkles } from 'lucide-react';
+import { X, Check, Building2, Search, Sparkles, CheckCircle2, XCircle, Clock, MinusCircle, Circle } from 'lucide-react';
 import { SitePackage, SiteStatus } from '../types/reporting';
 import { searchMasterSites, MasterSite } from '../services/siteDatabase';
 
@@ -153,12 +153,12 @@ export const SiteEditModal: React.FC<SiteEditModalProps> = ({
     onClose();
   };
 
-  const statusOptions: { value: SiteStatus; label: string; icon: string }[] = [
-    { value: 'DONE', label: '✅ SELESAI / DONE', icon: '✅' },
-    { value: 'NOK', label: '❌ NOK', icon: '❌' },
-    { value: 'PROGRESS', label: '⏳ ON PROGRESS', icon: '⏳' },
-    { value: 'NA', label: 'N/A', icon: 'N/A' },
-    { value: 'UNCHECKED', label: 'Belum Diperiksa', icon: '⚪' },
+  const statusOptions: { value: SiteStatus; label: string; icon: React.ReactNode }[] = [
+    { value: 'DONE', label: 'SELESAI / DONE', icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 inline mr-1" /> },
+    { value: 'NOK', label: 'NOK', icon: <XCircle className="w-3.5 h-3.5 text-rose-400 inline mr-1" /> },
+    { value: 'PROGRESS', label: 'ON PROGRESS', icon: <Clock className="w-3.5 h-3.5 text-amber-400 inline mr-1" /> },
+    { value: 'NA', label: 'N/A', icon: <MinusCircle className="w-3.5 h-3.5 text-slate-400 inline mr-1" /> },
+    { value: 'UNCHECKED', label: 'Belum Diperiksa', icon: <Circle className="w-3.5 h-3.5 text-blue-400 inline mr-1" /> },
   ];
 
   return (

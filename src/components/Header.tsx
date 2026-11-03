@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Calendar,
   Shield,
@@ -11,9 +11,10 @@ import {
   X,
   Check,
   RotateCcw,
+  Clock,
 } from 'lucide-react';
-import { ReportDateInfo, AppAccount } from '../types/reporting';
-import { createReportDateInfo } from '../utils/dateUtils';
+import { ReportDateInfo, AppAccount, LiveConnectionStatus } from '../types/reporting';
+import { createReportDateInfo, getCurrentWibClockString } from '../utils/dateUtils';
 import { PWAInstallButton } from './PWAInstallButton';
 
 interface HeaderProps {
@@ -22,6 +23,7 @@ interface HeaderProps {
   isAdmin: boolean;
   onToggleAdmin: () => void;
   syncStatus: 'server' | 'local' | 'saving';
+  liveStatus?: LiveConnectionStatus;
   onGenerateReport: () => void;
   onOpenHistory: () => void;
   onResetData: () => void;
@@ -36,6 +38,7 @@ export const Header: React.FC<HeaderProps> = ({
   isAdmin,
   onToggleAdmin,
   syncStatus,
+  liveStatus = 'LIVE',
   onGenerateReport,
   onOpenHistory,
   onResetData,
@@ -44,6 +47,14 @@ export const Header: React.FC<HeaderProps> = ({
   activeAccount,
 }) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [wibClock, setWibClock] = useState(() => getCurrentWibClockString());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setWibClock(getCurrentWibClockString());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // App Title & Subtitle customizable state with localStorage persistence
   const [appTitle, setAppTitle] = useState(() => {
@@ -139,7 +150,46 @@ export const Header: React.FC<HeaderProps> = ({
                     <Pencil className="w-3 h-3" />
                   </button>
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                  <span className="text-amber-300 font-semibold text-[11px]">WIB (Asia/Jakarta)</span>
+                  <span className="text-amber-300 font-semibold text-[11px] font-mono flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-amber-400 inline animate-pulse" />
+                    <span>{wibClock}</span>
+                  </span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-600"></span>
+                  
+                  {/* Live Status Pill */}
+                  <div
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border transition-all ${
+                      liveStatus === 'LIVE'
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
+                        : liveStatus === 'SYNCING'
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
+                        : liveStatus === 'CONNECTING'
+                        ? 'bg-sky-500/20 text-sky-300 border-sky-500/50'
+                        : 'bg-rose-500/20 text-rose-300 border-rose-500/50'
+                    }`}
+                    title={
+                      liveStatus === 'LIVE'
+                        ? 'Database Firestore terhubung dan sinkron'
+                        : liveStatus === 'SYNCING'
+                        ? 'Sedang menyimpan perubahan ke Firestore & Server'
+                        : liveStatus === 'CONNECTING'
+                        ? 'Sedang menghubungkan ke Firestore...'
+                        : 'Koneksi terputus'
+                    }
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        liveStatus === 'LIVE'
+                          ? 'bg-emerald-400 animate-pulse'
+                          : liveStatus === 'SYNCING'
+                          ? 'bg-amber-400 animate-ping'
+                          : liveStatus === 'CONNECTING'
+                          ? 'bg-sky-400 animate-bounce'
+                          : 'bg-rose-400'
+                      }`}
+                    ></span>
+                    <span>{liveStatus}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -189,14 +239,14 @@ export const Header: React.FC<HeaderProps> = ({
                     className="ml-1 p-1 hover:bg-amber-500/20 rounded-md text-amber-400 transition-colors cursor-pointer"
                     title="Ubah Tanggal Laporan"
                   >
-                    ✎
+                    <Pencil className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
 
               {/* Native Calendar Overlay when editing date */}
               {showDatePicker && (
-                <div className="absolute top-full left-0 mt-2 z-50 bg-slate-900 border border-amber-500/40 p-3 rounded-xl shadow-2xl">
+                <div className="absolute top-full left-0 mt-2 z-50 bg-slate-900 border border-amber-500/40 p-3 rounded-xl shadow-2xl space-y-2 min-w-[220px]">
                   <label className="block text-xs font-semibold text-amber-300 mb-1">
                     Pilih Tanggal Laporan:
                   </label>
@@ -206,10 +256,21 @@ export const Header: React.FC<HeaderProps> = ({
                     onChange={handleCalendarChange}
                     className="bg-slate-800 border border-slate-700 text-white text-sm rounded-lg p-2 w-full focus:ring-2 focus:ring-amber-500 font-mono"
                   />
-                  <div className="mt-2 flex justify-end">
+                  <div className="pt-1 flex items-center justify-between gap-2 border-t border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onDateChange(createReportDateInfo());
+                        setShowDatePicker(false);
+                      }}
+                      className="px-2 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500 hover:text-slate-950 text-amber-300 text-[11px] font-bold transition-all cursor-pointer border border-amber-500/40"
+                      title="Set Tanggal Laporan ke Hari Ini (Real-time WIB)"
+                    >
+                      Hari Ini (Real-time WIB)
+                    </button>
                     <button
                       onClick={() => setShowDatePicker(false)}
-                      className="text-xs text-slate-400 hover:text-white"
+                      className="text-xs text-slate-400 hover:text-white px-2 py-1"
                     >
                       Batal
                     </button>

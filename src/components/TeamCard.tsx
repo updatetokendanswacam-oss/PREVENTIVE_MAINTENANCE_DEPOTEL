@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Phone, Plus, Trash2, CheckCircle2, Archive, ChevronDown, ChevronUp, Radio, RotateCcw } from 'lucide-react';
+import { Phone, Plus, Trash2, CheckCircle2, Archive, ChevronDown, ChevronUp, Radio, RotateCcw, Pencil, Check, X, Clock, XCircle, MinusCircle, Circle } from 'lucide-react';
 import { TeamData, SiteStatus, SitePackage } from '../types/reporting';
 import { groupSitesIntoPackages } from '../utils/packageUtils';
 
@@ -43,12 +43,12 @@ export const TeamCard = React.memo<TeamCardProps>(({
     setEditingNotePkgId(null);
   };
 
-  const statusOptions: { value: SiteStatus; label: string; shortLabel: string; icon: string; badgeClass: string }[] = [
-    { value: 'DONE', label: 'SELESAI', shortLabel: 'OK', icon: '✅', badgeClass: 'bg-emerald-500/25 text-emerald-300 border-emerald-500/60' },
-    { value: 'NOK', label: 'NOK', shortLabel: 'NOK', icon: '❌', badgeClass: 'bg-rose-500/25 text-rose-300 border-rose-500/60' },
-    { value: 'PROGRESS', label: 'PROGRESS', shortLabel: 'PRG', icon: '⏳', badgeClass: 'bg-amber-500/25 text-amber-300 border-amber-500/60' },
-    { value: 'NA', label: 'N/A', shortLabel: 'N/A', icon: '⊘', badgeClass: 'bg-slate-700/60 text-slate-300 border-slate-600' },
-    { value: 'UNCHECKED', label: 'BELUM', shortLabel: 'BLM', icon: '⚪', badgeClass: 'bg-blue-950/50 text-blue-300 border-blue-800/60' },
+  const statusOptions: { value: SiteStatus; label: string; shortLabel: string; icon: React.ReactNode; badgeClass: string }[] = [
+    { value: 'DONE', label: 'SELESAI', shortLabel: 'OK', icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />, badgeClass: 'bg-emerald-500/25 text-emerald-300 border-emerald-500/60' },
+    { value: 'NOK', label: 'NOK', shortLabel: 'NOK', icon: <XCircle className="w-3.5 h-3.5 text-rose-400" />, badgeClass: 'bg-rose-500/25 text-rose-300 border-rose-500/60' },
+    { value: 'PROGRESS', label: 'PROGRESS', shortLabel: 'PRG', icon: <Clock className="w-3.5 h-3.5 text-amber-400" />, badgeClass: 'bg-amber-500/25 text-amber-300 border-amber-500/60' },
+    { value: 'NA', label: 'N/A', shortLabel: 'N/A', icon: <MinusCircle className="w-3.5 h-3.5 text-slate-400" />, badgeClass: 'bg-slate-700/60 text-slate-300 border-slate-600' },
+    { value: 'UNCHECKED', label: 'BELUM', shortLabel: 'BLM', icon: <Circle className="w-3.5 h-3.5 text-blue-400" />, badgeClass: 'bg-blue-950/50 text-blue-300 border-blue-800/60' },
   ];
 
   // Group team sites into unified packages (Site + Tower Space + EAS)
@@ -92,7 +92,7 @@ export const TeamCard = React.memo<TeamCardProps>(({
                 className="p-2 rounded-xl bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-amber-400 transition-all shadow"
                 title="Edit Team"
               >
-                ✎
+                <Pencil className="w-4 h-4" />
               </button>
               <button
                 onClick={() => onDeleteTeam(team.id)}
@@ -189,7 +189,7 @@ export const TeamCard = React.memo<TeamCardProps>(({
                           className="p-1.5 rounded-lg bg-slate-900 hover:bg-amber-500 hover:text-slate-950 text-slate-400 transition-colors border border-slate-800"
                           title="Edit Paket Site"
                         >
-                          ✎
+                          <Pencil className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => onDeletePackage(team.id, pkg.packageId)}
@@ -319,7 +319,7 @@ export const TeamCard = React.memo<TeamCardProps>(({
                               className="px-2 py-1 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[10px] cursor-pointer"
                               title="Simpan Keterangan Note"
                             >
-                              ✓
+                              <Check className="w-3 h-3" />
                             </button>
                             <button
                               type="button"
@@ -327,7 +327,7 @@ export const TeamCard = React.memo<TeamCardProps>(({
                               className="px-1.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 text-[10px] cursor-pointer"
                               title="Batal"
                             >
-                              ✕
+                              <X className="w-3 h-3" />
                             </button>
                           </div>
                         ) : (
@@ -359,7 +359,8 @@ export const TeamCard = React.memo<TeamCardProps>(({
                             className="text-[10px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors cursor-pointer"
                             title="Edit Keterangan Site"
                           >
-                            ✎ Note
+                            <Pencil className="w-3 h-3" />
+                            <span>Note</span>
                           </button>
                         </div>
                       )}

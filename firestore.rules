@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Test connection doc
+    match /test/connection {
+      allow read, write: if true;
+    }
+
+    // User profiles
+    match /users/{userId} {
+      allow read, create, update, delete: if true;
+    }
+
+    // Daily Reports
+    match /dailyReports/{reportId} {
+      allow read, create, update, delete, write: if true;
+    }
+
+    // Audit Activity Logs
+    match /auditLogs/{logId} {
+      allow read, create, update, delete: if true;
+    }
+
+    // Admins Reference Collection
+    match /admins/{userId} {
+      allow read, create, update, delete, write: if true;
+    }
+  }
+}
