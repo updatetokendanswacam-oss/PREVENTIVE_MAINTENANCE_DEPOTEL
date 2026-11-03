@@ -22,6 +22,7 @@ import {
   SiteItem,
   SitePackage,
   SiteStatus,
+  GensetFixSite,
   ReportDateInfo,
   ToastMessage,
   AppAccount,
@@ -52,6 +53,7 @@ import {
   subscribeToAuditLogs,
   saveDailyReportToFirestore,
   saveUserToFirestore,
+  deleteUserFromFirestore,
   logAuditActivity,
   isEmailAdmin,
   signInWithGooglePopup,
@@ -193,14 +195,8 @@ export default function App() {
     );
 
     const unsubUsers = subscribeToUsers((remoteUsers) => {
-      if (Array.isArray(remoteUsers) && remoteUsers.length > 0) {
-        setAccounts((prev) => {
-          // Merge remote users with existing users
-          const map = new Map<string, AppAccount>();
-          prev.forEach((u) => map.set(u.id, u));
-          remoteUsers.forEach((u) => map.set(u.id, u));
-          return Array.from(map.values());
-        });
+      if (Array.isArray(remoteUsers)) {
+        setAccounts(remoteUsers);
       }
     });
 
@@ -254,19 +250,34 @@ export default function App() {
     setLiveStatus('SYNCING');
     const res = await saveAccount(accountData);
     const updatedUsers = res.users || (await fetchAccounts()).users;
-    setAccounts(updatedUsers);
+
+    setAccounts((prev) => {
+      const map = new Map<string, AppAccount>();
+      prev.forEach((u) => {
+        const key = u.email ? u.email.toLowerCase().trim() : u.id;
+        map.set(key, u);
+      });
+      updatedUsers.forEach((u) => {
+        const key = u.email ? u.email.toLowerCase().trim() : u.id;
+        const existing = map.get(key);
+        map.set(key, existing ? { ...existing, ...u } : u);
+      });
+      return Array.from(map.values());
+    });
 
     if (accountData.email && accountData.name) {
+      const cleanEmail = accountData.email.toLowerCase().trim();
+      const existingAcc = accounts.find((a) => a.email.toLowerCase() === cleanEmail);
       const accToSave: AppAccount = {
-        id: accountData.id || `acc-${Date.now()}`,
+        id: accountData.id || existingAcc?.id || `acc-${Date.now()}`,
         name: accountData.name,
-        email: accountData.email,
+        email: cleanEmail,
         role: accountData.role || 'ROLE_USER',
         status: accountData.status || 'AKTIF',
         approved: accountData.approved !== undefined ? accountData.approved : true,
         assignedTeamId: accountData.assignedTeamId || 'ALL',
         isGoogleConnected: true,
-        createdAt: new Date().toISOString(),
+        createdAt: existingAcc?.createdAt || new Date().toISOString(),
         lastLoginAt: new Date().toISOString(),
       };
       await saveUserToFirestore(accToSave);
@@ -275,11 +286,11 @@ export default function App() {
     setLiveStatus('LIVE');
 
     setActiveAccount((prev) => {
+      if (prev?.id === 'acc-admin-main' || prev?.email === 'updatetokendanswacam@gmail.com') return prev;
       const adminMain = updatedUsers.find((u) => u.id === 'acc-admin-main') || 
                         updatedUsers.find((u) => u.email === 'updatetokendanswacam@gmail.com') ||
                         updatedUsers.find((u) => u.role === 'ROLE_ADMIN' && u.status === 'AKTIF');
-      if (prev?.id === 'acc-admin-main') return prev;
-      return adminMain || prev || updatedUsers[0];
+      return prev || adminMain || updatedUsers[0];
     });
     setIsAdmin(true);
     showToast(res.message || 'Akun berhasil ditambahkan', 'success');
@@ -327,15 +338,24 @@ export default function App() {
 
     try {
       setLiveStatus('SYNCING');
+
+      // 1. Delete from Firestore collection 'users'
+      await deleteUserFromFirestore(targetAcc.id);
+
+      // 2. Delete from Express server & localStorage
       const res = await deleteAccount(id);
-      if (res.success) {
-        const updatedUsers = res.users || (await fetchAccounts()).users;
-        setAccounts(updatedUsers);
-        await logAuditActivity('DELETE_ACCOUNT', `Admin deleted account ${targetAcc.name} (${targetAcc.email})`, activeAccount?.email, activeAccount?.name, activeAccount?.role);
-        showToast(`Akun '${targetAcc.name}' berhasil dihapus permanen!`, 'success');
-      }
+
+      // 3. Update React state immediately with deleted user filtered out
+      const remainingUsers = (res.users || accounts).filter(
+        (a) => a.id !== targetAcc.id && a.email.toLowerCase() !== targetAcc.email.toLowerCase()
+      );
+      setAccounts(remainingUsers);
+
+      await logAuditActivity('DELETE_ACCOUNT', `Admin deleted account ${targetAcc.name} (${targetAcc.email})`, activeAccount?.email, activeAccount?.name, activeAccount?.role);
+      showToast(`Akun '${targetAcc.name}' berhasil dihapus permanen!`, 'success');
     } catch (err) {
       console.error('Delete account error:', err);
+      showToast('Gagal menghapus akun', 'error');
     } finally {
       setLiveStatus('LIVE');
     }
@@ -459,19 +479,16 @@ export default function App() {
 
   const handleSaveTeam = async (teamInfo: Partial<TeamData>) => {
     let newTeams = [...reportData.teams];
-    let createdOrUpdatedTeam: TeamData | null = null;
 
     if (teamInfo.id) {
       newTeams = newTeams.map((t) => {
         if (t.id === teamInfo.id) {
-          const updated = {
+          return {
             ...t,
             name: teamInfo.name || t.name,
             phone: teamInfo.phone || t.phone,
             teamNumber: teamInfo.teamNumber || t.teamNumber,
           };
-          createdOrUpdatedTeam = updated;
-          return updated;
         }
         return t;
       });
@@ -484,43 +501,13 @@ export default function App() {
         sites: [],
       };
       newTeams.push(newTeam);
-      createdOrUpdatedTeam = newTeam;
     }
 
     newTeams.sort((a, b) => a.teamNumber - b.teamNumber);
 
-    // Auto-create or update team user account in accounts list & Firestore
-    if (createdOrUpdatedTeam) {
-      const targetTeam = createdOrUpdatedTeam as TeamData;
-      const existingAcc = accounts.find((a) => a.assignedTeamId === targetTeam.id);
-      if (existingAcc) {
-        await handleSaveAccount({
-          id: existingAcc.id,
-          name: `${targetTeam.name} (TEAM ${targetTeam.teamNumber})`,
-          department: `Team Lapangan ${targetTeam.teamNumber}`,
-        });
-      } else {
-        const cleanName = (targetTeam.name || 'team').toLowerCase().replace(/[^a-z0-9]/g, '');
-        const newTeamAcc: AppAccount = {
-          id: `acc-user-${targetTeam.id}`,
-          name: `${targetTeam.name} (TEAM ${targetTeam.teamNumber})`,
-          email: `${cleanName}${targetTeam.teamNumber || 'X'}.depotel@gmail.com`,
-          role: 'ROLE_USER',
-          status: 'AKTIF',
-          approved: true,
-          assignedTeamId: targetTeam.id,
-          isGoogleConnected: false,
-          department: `Team Lapangan ${targetTeam.teamNumber}`,
-          createdAt: new Date().toISOString(),
-          lastLoginAt: new Date().toISOString(),
-        };
-        await handleSaveAccount(newTeamAcc);
-      }
-    }
-
     await applyDashboardUpdate(
       (prev) => ({ ...prev, teams: newTeams }),
-      { message: teamInfo.id ? 'Data team berhasil diperbarui' : 'Team baru & akun user team berhasil ditambahkan' },
+      { message: teamInfo.id ? 'Data team berhasil diperbarui' : 'Team baru berhasil ditambahkan' },
       true
     );
   };
@@ -869,38 +856,104 @@ export default function App() {
   };
 
   // Genset Fix Handlers
-  const handleAddGensetSite = async (siteName: string, status: SiteStatus) => {
-    const newSites = [
+  const recalculateGensetCategories = (categories: JobCategory[], gensetSites: GensetFixSite[]): JobCategory[] => {
+    const closedCount = gensetSites.filter((g) => g.isClosed || g.status === 'DONE').length;
+    const totalCount = gensetSites.length;
+
+    return categories.map((cat) => {
+      if (cat.id === 'pm_genset') {
+        const newAchievement = closedCount;
+        const newTarget = Math.max(cat.target, totalCount, newAchievement);
+        const newRemaining = Math.max(0, newTarget - newAchievement);
+        const newPercentage = newTarget > 0 ? Math.round((newAchievement / newTarget) * 100) : 100;
+        return {
+          ...cat,
+          target: newTarget,
+          achievement: newAchievement,
+          remaining: newRemaining,
+          percentage: newPercentage,
+        };
+      }
+      return cat;
+    });
+  };
+
+  const handleAddGensetSite = async (
+    siteName: string,
+    status: SiteStatus,
+    siteId?: string,
+    teamName?: string,
+    technicianName?: string,
+    note?: string,
+    technicianPhone?: string,
+    isClosed?: boolean
+  ) => {
+    const isClosedVal = isClosed !== undefined ? isClosed : status === 'DONE';
+    const newSites: GensetFixSite[] = [
       ...reportData.gensetFixSites,
       {
         id: `genset-${Date.now()}`,
+        siteId: siteId || '',
         siteName,
+        teamName: teamName || '',
         status,
-        technicianName: activeAccount?.name || 'SAMIN',
+        technicianName: technicianName || activeAccount?.name || 'DODI',
+        technicianPhone: technicianPhone || '',
+        isClosed: isClosedVal,
+        closedAt: isClosedVal ? new Date().toISOString() : undefined,
+        note: note || '',
       },
     ];
+    const newCategories = recalculateGensetCategories(reportData.categories, newSites);
     await applyDashboardUpdate(
-      (prev) => ({ ...prev, gensetFixSites: newSites }),
-      { message: 'Site Genset Fix berhasil ditambahkan' },
+      (prev) => ({ ...prev, gensetFixSites: newSites, categories: newCategories }),
+      { message: 'Site Genset Fix berhasil ditambahkan (Hitungan BAGIAN B PM GENSET otomatis terupdate)' },
       true
     );
   };
 
-  const handleEditGensetSite = async (siteId: string, siteName: string, status: SiteStatus) => {
-    const newSites = reportData.gensetFixSites.map((g) =>
-      g.id === siteId ? { ...g, siteName, status } : g
-    );
+  const handleEditGensetSite = async (
+    siteIdKey: string,
+    siteName: string,
+    status: SiteStatus,
+    siteId?: string,
+    teamName?: string,
+    technicianName?: string,
+    note?: string,
+    technicianPhone?: string,
+    isClosed?: boolean
+  ) => {
+    const newSites: GensetFixSite[] = reportData.gensetFixSites.map((g) => {
+      if (g.id === siteIdKey) {
+        const closedVal = isClosed !== undefined ? isClosed : (status === 'DONE' ? true : g.isClosed);
+        return {
+          ...g,
+          siteName,
+          status,
+          siteId: siteId !== undefined ? siteId : g.siteId,
+          teamName: teamName !== undefined ? teamName : g.teamName,
+          technicianName: technicianName !== undefined ? technicianName : g.technicianName,
+          technicianPhone: technicianPhone !== undefined ? technicianPhone : g.technicianPhone,
+          isClosed: closedVal,
+          closedAt: closedVal ? (g.closedAt || new Date().toISOString()) : undefined,
+          note: note !== undefined ? note : g.note,
+        };
+      }
+      return g;
+    });
+    const newCategories = recalculateGensetCategories(reportData.categories, newSites);
     await applyDashboardUpdate(
-      (prev) => ({ ...prev, gensetFixSites: newSites }),
-      { message: 'Site Genset Fix berhasil diperbarui' },
+      (prev) => ({ ...prev, gensetFixSites: newSites, categories: newCategories }),
+      { message: 'Site Genset Fix & BAGIAN B PM GENSET berhasil diperbarui' },
       true
     );
   };
 
   const handleDeleteGensetSite = async (siteId: string) => {
     const newSites = reportData.gensetFixSites.filter((g) => g.id !== siteId);
+    const newCategories = recalculateGensetCategories(reportData.categories, newSites);
     await applyDashboardUpdate(
-      (prev) => ({ ...prev, gensetFixSites: newSites }),
+      (prev) => ({ ...prev, gensetFixSites: newSites, categories: newCategories }),
       { message: 'Site Genset Fix berhasil dihapus' },
       true
     );
@@ -1144,6 +1197,7 @@ export default function App() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
               <GensetFixSection
                 sites={reportData.gensetFixSites}
+                teams={reportData.teams}
                 isAdmin={isAdmin}
                 onAddSite={handleAddGensetSite}
                 onEditSite={handleEditGensetSite}

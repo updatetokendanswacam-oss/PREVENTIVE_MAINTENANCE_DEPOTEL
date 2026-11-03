@@ -52,12 +52,17 @@ export interface GensetFixSite {
   id: string;
   siteId?: string;
   siteName: string;
+  teamName?: string;
+  teamId?: string;
   status: SiteStatus;
   lat?: number;
   lng?: number;
   note?: string;
   photoUrl?: string; // Photo documentation
   technicianName?: string;
+  technicianPhone?: string;
+  isClosed?: boolean;
+  closedAt?: string;
 }
 
 export interface ReportDateInfo {

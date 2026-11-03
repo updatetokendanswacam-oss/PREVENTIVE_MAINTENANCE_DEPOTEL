@@ -119,16 +119,52 @@ export function generateWhatsAppReport(data: DailyReportData): string {
   // PM Genset Fix Section
   lines.push('*D. PM Genset Fix*');
   lines.push('');
-  lines.push('List Site:');
 
-  if (data.gensetFixSites.length === 0) {
+  const KNOWN_TECH_PHONES: Record<string, string> = {
+    'SAMIN': '082374227775',
+    'MUHAMAD JUNAEDI': '08119234976',
+    'RANDI AFDIANSYAH': '08131423533',
+    'KOSASIH': '08119234974',
+    'ROMI HENDRA GUNAWAN': '081319012052',
+    'ROY ISHARRYANTO': '081286241842',
+    'DODI': '081283606526',
+  };
+
+  if (!data.gensetFixSites || data.gensetFixSites.length === 0) {
+    lines.push('List Site:');
     lines.push('');
   } else {
-    data.gensetFixSites.forEach((gSite, idx) => {
-      const formattedLine = formatSiteLine(gSite.siteName, gSite.status);
-      lines.push(`${idx + 1}. ${formattedLine}`);
+    // Group Genset Fix sites by technician
+    const techMap = new Map<string, { techName: string; phone: string; sites: typeof data.gensetFixSites }>();
+
+    data.gensetFixSites.forEach((gSite) => {
+      const rawTech = (gSite.technicianName || 'TEKNISI').trim();
+      const upperTech = rawTech.toUpperCase();
+      let phone = (gSite.technicianPhone || '').trim();
+      if (!phone && KNOWN_TECH_PHONES[upperTech]) {
+        phone = KNOWN_TECH_PHONES[upperTech];
+      }
+
+      const groupKey = `${upperTech}_${phone}`;
+      if (!techMap.has(groupKey)) {
+        techMap.set(groupKey, { techName: upperTech, phone, sites: [] });
+      }
+      techMap.get(groupKey)!.sites.push(gSite);
     });
-    lines.push('');
+
+    let techIdx = 1;
+    techMap.forEach(({ techName, phone, sites }) => {
+      const phoneStr = phone ? ` (${phone})` : '';
+      lines.push(`${techIdx++}. ${techName}${phoneStr}`);
+
+      sites.forEach((site) => {
+        const siteLine = formatSiteLine(site.siteName, site.status);
+        lines.push(` • ${siteLine}`);
+        const noteText = site.note?.trim() || '';
+        lines.push(`Keterangan : ${noteText}`);
+      });
+      lines.push('');
+    });
   }
 
   lines.push('*NOTE*');

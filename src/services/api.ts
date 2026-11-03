@@ -285,33 +285,41 @@ export async function fetchAccounts(): Promise<{
   users: AppAccount[];
   activeUserId: string;
 }> {
+  let loadedUsers: AppAccount[] = [];
+  let activeId: string = DEFAULT_LOCAL_ACCOUNTS[0].id;
+
   try {
     const res = await fetch('/api/users');
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.users)) {
-        localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(data.users));
-        localStorage.setItem(ACTIVE_ACCOUNT_KEY, data.activeUserId || data.users[0]?.id || '');
-        return { users: data.users, activeUserId: data.activeUserId || data.users[0]?.id };
+        loadedUsers = data.users;
+        activeId = data.activeUserId || data.users[0]?.id || activeId;
       }
     }
   } catch (err) {
     console.warn('Server users fetch failed, using local fallback', err);
   }
 
-  // Fallback to local storage
-  const localUsers = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
-  const activeId = localStorage.getItem(ACTIVE_ACCOUNT_KEY);
-  if (localUsers) {
-    try {
-      const parsed = JSON.parse(localUsers);
-      return { users: parsed, activeUserId: activeId || parsed[0]?.id || '' };
-    } catch (e) {
-      console.error(e);
+  if (loadedUsers.length === 0) {
+    const localUsers = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
+    const savedActiveId = localStorage.getItem(ACTIVE_ACCOUNT_KEY);
+    if (localUsers) {
+      try {
+        loadedUsers = JSON.parse(localUsers);
+        if (savedActiveId) activeId = savedActiveId;
+      } catch (e) {
+        console.error(e);
+      }
     }
   }
 
-  return { users: DEFAULT_LOCAL_ACCOUNTS, activeUserId: DEFAULT_LOCAL_ACCOUNTS[0].id };
+  const finalUsers = loadedUsers.length > 0 ? loadedUsers : DEFAULT_LOCAL_ACCOUNTS;
+
+  localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(finalUsers));
+  localStorage.setItem(ACTIVE_ACCOUNT_KEY, activeId);
+
+  return { users: finalUsers, activeUserId: activeId };
 }
 
 export async function saveAccount(account: Partial<AppAccount>): Promise<{

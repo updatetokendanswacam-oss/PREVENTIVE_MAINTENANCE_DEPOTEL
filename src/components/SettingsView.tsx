@@ -23,7 +23,6 @@ import {
   Zap,
   Copy,
   Check,
-  Activity,
   UserPlus,
   Users,
 } from 'lucide-react';
@@ -920,51 +919,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         })()}
       </div>
 
-      {/* 4. FIRESTORE AUDIT ACTIVITY LOGS */}
-      {isAdmin && (
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-            <div className="flex items-center gap-2">
-              <Activity className="w-5 h-5 text-amber-400" />
-              <h3 className="text-base font-extrabold text-white tracking-tight">
-                RIWAYAT AKTIVITAS & PERUBAHAN (FIRESTORE AUDIT LOG)
-              </h3>
-            </div>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">
-              REALTIME AUDIT
-            </span>
-          </div>
 
-          <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-            {auditLogs.length === 0 ? (
-              <div className="p-4 text-center text-xs text-slate-500 font-mono bg-slate-950/60 rounded-xl border border-slate-800">
-                Belum ada catatan aktivitas baru di Firestore.
-              </div>
-            ) : (
-              auditLogs.map((log) => (
-                <div
-                  key={log.id}
-                  className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex items-start justify-between gap-3 text-xs font-mono"
-                >
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-amber-300">{log.userName || log.userEmail}</span>
-                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300">
-                        {log.userRole || 'USER'}
-                      </span>
-                      <span className="text-emerald-400 font-bold">{log.action}</span>
-                    </div>
-                    <p className="text-slate-300 text-[11px]">{log.details}</p>
-                  </div>
-                  <span className="text-[10px] text-slate-500 shrink-0">
-                    {new Date(log.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
 
       {/* 5. INTEGRASI GITHUB & VERCEL REALTIME (AUTO-SYNC DATABASE) */}
       <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/60 border border-indigo-500/30 rounded-2xl p-5 sm:p-6 shadow-2xl space-y-5 relative overflow-hidden">
@@ -1044,6 +999,28 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <span>{syncSuccessMsg}</span>
           </div>
         )}
+
+        {/* Vercel Environment Variables Auto-Connect Helper */}
+        <div className="p-3.5 rounded-xl bg-slate-950/90 border border-indigo-500/30 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-indigo-300 font-mono flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5 text-amber-400" />
+              <span>VERCEL ENVIRONMENT VARIABLES (AUTO-SYNC DATABASE)</span>
+            </span>
+            <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30 font-mono font-bold">
+              FIRESTORE ID: ai-studio-dailyreportingde-d4f74179
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-300">
+            Agar deployment Vercel dapat membaca database real-time dari GitHub & Google AI Studio, salin Environment Variables berikut ke Vercel Project Settings:
+          </p>
+          <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 font-mono text-[11px] text-amber-300 space-y-1 select-all">
+            <div>VITE_FIREBASE_PROJECT_ID=ai-studio-dailyreportingde-d4f74179-793e-46b8-b37c-8ccbcc561d6c</div>
+            <div>VITE_FIREBASE_FIRESTORE_DATABASE_ID=(default)</div>
+            <div>VITE_FIREBASE_REGION=asia-southeast1</div>
+            <div>VITE_FIREBASE_REALTIME_SYNC=true</div>
+          </div>
+        </div>
 
         {/* Configuration Form */}
         <form onSubmit={handleSaveGithubVercelConfig} className="space-y-4 pt-1">

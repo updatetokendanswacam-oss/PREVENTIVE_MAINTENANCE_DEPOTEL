@@ -18,6 +18,8 @@ interface AppAccountServer {
   email: string;
   role: 'ROLE_ADMIN' | 'ROLE_USER';
   status: 'AKTIF' | 'NONAKTIF';
+  approved?: boolean;
+  assignedTeamId?: string;
   isGoogleConnected: boolean;
   avatarUrl?: string;
   department?: string;
@@ -40,9 +42,11 @@ const DEFAULT_ACCOUNTS: AppAccountServer[] = [
     email: 'updatetokendanswacam@gmail.com',
     role: 'ROLE_ADMIN',
     status: 'AKTIF',
+    approved: true,
     isGoogleConnected: true,
     avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face',
     department: 'Operations & Management DEPOTEL',
+    assignedTeamId: 'ALL',
     createdAt: new Date().toISOString(),
     lastLoginAt: new Date().toISOString(),
   },
@@ -52,8 +56,10 @@ const DEFAULT_ACCOUNTS: AppAccountServer[] = [
     email: 'muhamadjunaedi057@gmail.com',
     role: 'ROLE_ADMIN',
     status: 'AKTIF',
+    approved: true,
     isGoogleConnected: true,
     department: 'Admin Team',
+    assignedTeamId: 'ALL',
     createdAt: new Date().toISOString(),
     lastLoginAt: new Date().toISOString(),
   },
@@ -63,19 +69,88 @@ const DEFAULT_ACCOUNTS: AppAccountServer[] = [
     email: 'field.depotel@gmail.com',
     role: 'ROLE_USER',
     status: 'AKTIF',
+    approved: true,
     isGoogleConnected: true,
     department: 'Team Lapangan Southern',
+    assignedTeamId: 'ALL',
     createdAt: new Date().toISOString(),
     lastLoginAt: new Date().toISOString(),
   },
   {
-    id: 'acc-user-junaedi',
+    id: 'acc-user-team-1',
+    name: 'SAMIN (TEAM 1)',
+    email: 'samin.depotel@gmail.com',
+    role: 'ROLE_USER',
+    status: 'AKTIF',
+    approved: true,
+    isGoogleConnected: false,
+    department: 'Team Lapangan 1',
+    assignedTeamId: 'team-1',
+    createdAt: new Date().toISOString(),
+    lastLoginAt: new Date().toISOString(),
+  },
+  {
+    id: 'acc-user-team-2',
     name: 'MUHAMAD JUNAEDI (TEAM 2)',
     email: 'junaedi.depotel@gmail.com',
     role: 'ROLE_USER',
     status: 'AKTIF',
+    approved: true,
     isGoogleConnected: false,
-    department: 'Field Coordinator',
+    department: 'Team Lapangan 2',
+    assignedTeamId: 'team-2',
+    createdAt: new Date().toISOString(),
+    lastLoginAt: new Date().toISOString(),
+  },
+  {
+    id: 'acc-user-team-3',
+    name: 'RANDI AFDIANSYAH (TEAM 3)',
+    email: 'randi.depotel@gmail.com',
+    role: 'ROLE_USER',
+    status: 'AKTIF',
+    approved: true,
+    isGoogleConnected: false,
+    department: 'Team Lapangan 3',
+    assignedTeamId: 'team-3',
+    createdAt: new Date().toISOString(),
+    lastLoginAt: new Date().toISOString(),
+  },
+  {
+    id: 'acc-user-team-4',
+    name: 'KOSASIH (TEAM 4)',
+    email: 'kosasih.depotel@gmail.com',
+    role: 'ROLE_USER',
+    status: 'AKTIF',
+    approved: true,
+    isGoogleConnected: false,
+    department: 'Team Lapangan 4',
+    assignedTeamId: 'team-4',
+    createdAt: new Date().toISOString(),
+    lastLoginAt: new Date().toISOString(),
+  },
+  {
+    id: 'acc-user-team-5',
+    name: 'ROMI HENDRA GUNAWAN (TEAM 5)',
+    email: 'romi.depotel@gmail.com',
+    role: 'ROLE_USER',
+    status: 'AKTIF',
+    approved: true,
+    isGoogleConnected: false,
+    department: 'Team Lapangan 5',
+    assignedTeamId: 'team-5',
+    createdAt: new Date().toISOString(),
+    lastLoginAt: new Date().toISOString(),
+  },
+  {
+    id: 'acc-user-team-6',
+    name: 'ROY ISHARRYANTO (TEAM 6)',
+    email: 'roy.depotel@gmail.com',
+    role: 'ROLE_USER',
+    status: 'AKTIF',
+    approved: true,
+    isGoogleConnected: false,
+    department: 'Team Lapangan 6',
+    assignedTeamId: 'team-6',
     createdAt: new Date().toISOString(),
     lastLoginAt: new Date().toISOString(),
   },
@@ -86,7 +161,7 @@ function loadDatabase(): DatabaseStructure {
     if (fs.existsSync(DB_FILE)) {
       const content = fs.readFileSync(DB_FILE, 'utf-8');
       const parsed = JSON.parse(content);
-      const users = Array.isArray(parsed.users)
+      const users: AppAccountServer[] = Array.isArray(parsed.users) && parsed.users.length > 0
         ? parsed.users
         : DEFAULT_ACCOUNTS;
       const activeUserId = parsed.activeUserId || (users[0] ? users[0].id : 'acc-admin-main');

@@ -21,6 +21,7 @@ import {
   limit,
   serverTimestamp,
   addDoc,
+  deleteDoc,
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { AppAccount, DailyReportData, AuditLog } from '../types/reporting';
@@ -208,6 +209,15 @@ export async function saveUserToFirestore(userAcc: AppAccount): Promise<void> {
     }
   } catch (err) {
     console.warn(`Firestore saveUserToFirestore warning (${userAcc.id}):`, err);
+  }
+}
+
+export async function deleteUserFromFirestore(userId: string): Promise<void> {
+  try {
+    const userRef = doc(db, 'users', userId);
+    await deleteDoc(userRef);
+  } catch (err) {
+    console.warn(`Firestore deleteUserFromFirestore warning (${userId}):`, err);
   }
 }
 
